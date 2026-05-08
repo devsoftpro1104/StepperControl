@@ -4,8 +4,8 @@
 телеметрии. Используется для отладки в терминале и как транспорт команд для
 GUI на PyQt/PySide6.
 
-Источник правды по грамматике — заголовок [firmware/src/middleware/cli/inc/cli.h](../firmware/src/middleware/cli/inc/cli.h).
-Реализация диспетчера — [cli.c](../firmware/src/middleware/cli/src/cli.c).
+Источник правды по грамматике — заголовок [firmware/src/middleware/shell/inc/shell.h](../firmware/src/middleware/shell/inc/shell.h).
+Реализация диспетчера — [shell.c](../firmware/src/middleware/shell/src/shell.c).
 
 > CLI **не заменяет** бинарный TLV-протокол из [protocol.md](protocol.md). Текстовый
 > канал удобен для интерактивной диагностики и быстрой интеграции GUI; бинарный
@@ -174,7 +174,7 @@ $T, 12385, 1200, 520, 23.6
 | `current`  | `uint16`  | ток фазы, мА (TODO: пока 0 — нет ADC)         |
 | `temp_c`   | `decimal` | температура с одной десятой знака: `23.5`, `-12.5`. Свежее значение от DS18B20 если `TEMP START`, иначе `0.0`. |
 
-Частота — `cli_telem_rate_hz()`, по умолчанию 50 Гц. На хосте — `split(", ")`,
+Частота — `shell_telem_rate_hz()`, по умолчанию 50 Гц. На хосте — `split(", ")`,
 числа приводить через `int(...)` для целочисленных полей и `float(...)` для
 температуры.
 
@@ -287,10 +287,10 @@ port.write(b"PING\r\n")
 
 Добавление новой команды — три шага:
 
-1. Реализовать обработчик в [cli.c](../firmware/src/middleware/cli/src/cli.c)
+1. Реализовать обработчик в [shell.c](../firmware/src/middleware/shell/src/shell.c)
    по сигнатуре `static void cmd_xxx(int argc, char *argv[])`.
 2. Зарегистрировать в таблице `s_cmds[]`.
-3. Описать команду здесь, в `docs/cli.md`, и в шапке [cli.h](../firmware/src/middleware/cli/inc/cli.h).
+3. Описать команду здесь, в `docs/cli.md`, и в шапке [shell.h](../firmware/src/middleware/shell/inc/shell.h).
 
 Если команда нужна и в бинарном протоколе — сначала добавить её в
 `shared/protocol/protocol.yaml`, потом завернуть текстовую обёртку.

@@ -101,7 +101,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     src/drivers/onewire/inc
     src/devices/ds18b20/inc
     src/middleware/protocol/inc
-    src/middleware/cli/inc
+    src/middleware/shell/inc
     src/config
     ${CMSIS_INC}
     ${CUBE_INC}

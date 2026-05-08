@@ -6,7 +6,7 @@
 #include "task.h"
 
 #include "uart.h"
-#include "cli.h"
+#include "shell.h"
 #include "temp_service.h"
 
 #include <stdio.h>
@@ -18,12 +18,12 @@ void task_telemetry(void *argument) {
     TickType_t last = xTaskGetTickCount();
 
     for (;;) {
-        uint16_t hz = cli_telem_rate_hz();
+        uint16_t hz = shell_telem_rate_hz();
         TickType_t period = (hz == 0U) ? pdMS_TO_TICKS(20)
                                        : pdMS_TO_TICKS(1000U / hz);
         if (period == 0U) period = 1U;
 
-        if (cli_telem_enabled()) {
+        if (shell_telem_enabled()) {
             uint32_t ts  = (uint32_t)xTaskGetTickCount();
             int32_t  pos = 0;        /* TODO: реальная позиция от драйвера мотора */
             uint16_t cur = 0U;       /* TODO: ADC ток */

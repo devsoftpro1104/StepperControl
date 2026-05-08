@@ -1,13 +1,14 @@
 /* Задача: разбор входящих кадров протокола, диспетчеризация команд.
-   Сейчас работает текстовый CLI (см. middleware/cli/inc/cli.h). Бинарный
-   фрейм-протокол по SOF/CRC будет добавлен поверх этого же транспорта. */
+   Сейчас работает текстовый shell (см. middleware/shell/inc/shell.h
+   и docs/cli.md). Бинарный фрейм-протокол по SOF/CRC будет добавлен
+   поверх этого же транспорта. */
 #include "cmsis_os2.h"
 #include "uart.h"
-#include "cli.h"
+#include "shell.h"
 
 void task_protocol(void *argument) {
     (void)argument;
-    cli_init();
+    shell_init();
 
     for (;;) {
         uint8_t b;
@@ -15,7 +16,7 @@ void task_protocol(void *argument) {
         /* Опустошаем RX-кольцо: при 115200 baud за 2 мс прилетает ≤24 байт,
            буфер 256 байт переполниться не успеет. */
         while (uart2_rx_get(&b)) {
-            cli_feed(b);
+            shell_feed(b);
             drained = 1;
         }
         if (!drained) osDelay(2);

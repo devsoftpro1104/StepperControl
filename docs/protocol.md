@@ -4,7 +4,11 @@
 Источник правды: [shared/protocol/protocol.yaml](../shared/protocol/protocol.yaml).
 Заголовки/коды/CRC генерируются скриптами `generate_c.py` и `generate_py.py`.
 
-См. также: [adr/0003-protocol-binary-tlv.md](adr/0003-protocol-binary-tlv.md).
+См. также:
+- [adr/0003-protocol-binary-tlv.md](adr/0003-protocol-binary-tlv.md) — почему бинарный.
+- [cli.md](cli.md) — параллельный текстовый shell-канал на том же UART (для
+  отладки в терминале и упрощённой интеграции GUI). Бинарный и текстовый
+  протоколы независимы; парсер хоста выбирает один из них на сессию.
 
 ## Кадр
 | Поле     | Размер | Описание                    |

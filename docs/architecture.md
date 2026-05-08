@@ -44,7 +44,7 @@ project-root/
 |-----------------------------|------------|
 | `architecture.md`           | этот файл — карта проекта |
 | `protocol.md`               | человекочитаемое описание бинарного протокола (источник правды — YAML в `shared/`) |
-| `cli.md`                    | текстовый CLI поверх UART (грамматика команд, стрим телеметрии, шаблон парсера на PySide6) |
+| `cli.md`                    | текстовый shell-протокол поверх UART (грамматика команд, стрим телеметрии, шаблон парсера на PySide6); реализация — `middleware/shell/` |
 | `pinout.md`                 | таблица «функция → пин MCU», синхронна с `bsp_pins.h` |
 | `memory_map.md`             | разбиение FLASH/RAM, синхронно с linker-скриптом |
 | `user_manual.md`            | как пользоваться GUI |
@@ -133,11 +133,13 @@ app
 - `inc/app_state.h` — конечный автомат (`BOOT/IDLE/MOVING/FAULT`).
 - `inc/app_events.h` — события, которыми задачи обмениваются.
 - `src/app_main.c`, `src/app_state.c` — реализация.
+- `inc/temp_service.h`, `src/temp_service.c` — состояние периодического опроса
+  DS18B20 (running/period/last value), мост между shell и task_diagnostic.
 - `src/tasks/` — по одной задаче на ответственность:
-  - `task_protocol.c` — приём кадров и диспетчер команд.
+  - `task_protocol.c` — приём байт из UART, кормит shell-парсер.
   - `task_motor.c` — исполнение профиля движения.
-  - `task_telemetry.c` — периодическая отправка телеметрии.
-  - `task_diagnostic.c` — мониторинг тока/температуры/перегрузок.
+  - `task_telemetry.c` — периодическая отправка стрима `$T,...`.
+  - `task_diagnostic.c` — LED-маяк, поллинг DS18B20, эмиссия `$T18,...`.
   - `task_watchdog.c` — поддержка IWDG.
 
 #### `firmware/src/bsp/` — Board Support Package
@@ -166,6 +168,7 @@ app
 | `timer/`   | таймеры (PWM для STEP, общие тики) |
 | `gpio/`    | универсальные хелперы для входов/выходов |
 | `flash/`   | стирание/запись страниц FLASH (для эмуляции EEPROM) |
+| `onewire/` | 1-Wire master через GPIO bit-bang + DWT микросекунды (для DS18B20) |
 
 #### `firmware/src/devices/` — драйверы внешних чипов
 Используют `drivers/`, но добавляют логику конкретного устройства.
@@ -176,6 +179,7 @@ app
 | `stepper/`     | драйвер шагового двигателя (STEP/DIR/EN) |
 | `ads1115/`     | I2C 16-бит ADC TI ADS1115 (внешний АЦП тока) |
 | `tja1051/`     | CAN-трансивер NXP TJA1051 (управление standby pin) |
+| `ds18b20/`     | 1-Wire термосенсор Maxim/Dallas DS18B20 (через `drivers/onewire/`) |
 
 #### `firmware/src/middleware/` — переиспользуемые компоненты
 Платформо-нейтральные модули, тестируются юнит-тестами без прошивания.
@@ -185,7 +189,7 @@ app
 | `ring_buffer/`  | lock-free кольцевой буфер для UART/USB |
 | `crc/`          | CRC-16/CCITT-FALSE (тот же, что на хосте) |
 | `protocol/`     | парсер кадров и заголовки, сгенерированные из YAML |
-| `shell/`        | мини-CLI поверх UART (диагностика) |
+| `shell/`        | текстовый CLI поверх UART (см. [cli.md](cli.md)) — диспетчер команд `PING/VER/MOVE/STOP/TELEM/TEMP/...` |
 | `logger/`       | структурированный лог в UART/USB-CDC |
 | `settings/`     | хранение настроек в EEPROM/эмуляции FLASH |
 | `motion/`       | планировщик движения (ускорение/торможение/S-curve) |
@@ -193,6 +197,14 @@ app
 
 `middleware/protocol/` отдельно: содержит `protocol_gen.h` — артефакт
 кодогенерации; правится **только** через изменение `shared/protocol/protocol.yaml`.
+
+`middleware/shell/` — узаконенное исключение из правила «middleware зовёт
+только hal_port». По смыслу shell — это диспетчер команд приложения,
+который удобно держать как отдельный переиспользуемый модуль; он напрямую
+вызывает `app/app_state`, `app/temp_service`, `devices/ds18b20`,
+`drivers/uart`. Его источник правды по протоколу — заголовок
+[shell.h](../firmware/src/middleware/shell/inc/shell.h) и [docs/cli.md](cli.md),
+а **не** `shared/protocol/protocol.yaml` (там описан бинарный TLV-канал).
 
 #### `firmware/src/hal_port/`
 Тонкая прослойка между прикладным/middleware-кодом и `drivers`/LL.
@@ -370,8 +382,10 @@ Qt-модели данных и кольцевые буферы (для граф
    `stm32f4xx.h` напрямую — только через `hal_port`. UI хоста не подключает
    `serial` напрямую — только через `transport.base.Transport`.
 2. **Один источник правды.** Пины — `bsp_pins.h`. Версия прошивки —
-   `bsp_version.h`. Протокол — `shared/protocol/protocol.yaml`. Карта памяти —
-   linker-скрипт. Документация ссылается на эти источники, не дублирует их.
+   `bsp_version.h`. Бинарный протокол — `shared/protocol/protocol.yaml`.
+   Текстовый shell-протокол — [shell.h](../firmware/src/middleware/shell/inc/shell.h)
+   плюс [docs/cli.md](cli.md). Карта памяти — linker-скрипт. Документация
+   ссылается на эти источники, не дублирует их.
 3. **Сначала тест, потом фича.** Любое изменение middleware/protocol/CRC
    сопровождается юнит-тестом в `firmware/tests/unit/` или `software/tests/unit/`.
 4. **Ничего лишнего в `third_party/`.** Сторонний код не правим. Если нужна
