@@ -1,0 +1,6 @@
+/* Тёмная тема (skeleton). */
+QWidget       { background: #1e1e1e; color: #e0e0e0; }
+QPushButton   { background: #2d2d2d; border: 1px solid #444; padding: 4px 10px; }
+QPushButton:hover    { background: #3a3a3a; }
+QPushButton:pressed  { background: #555; }
+QLineEdit, QTextEdit { background: #252526; border: 1px solid #444; }

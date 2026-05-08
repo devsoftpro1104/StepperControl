@@ -1,0 +1,51 @@
+# Build
+build/
+out/
+dist/
+*.o
+*.obj
+*.elf
+*.hex
+*.bin
+*.map
+*.lst
+*.su
+*.d
+.cache/
+
+# CMake
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+
+# IDE
+.vscode/
+.idea/
+*.code-workspace
+*.user
+*.suo
+*.ncb
+*.sdf
+.vs/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Qt generated
+*_rc.py
+*.qm
+
+# OS
+Thumbs.db
+.DS_Store
+desktop.ini

@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Remove-Item -Path \"c:\\\\STM32\\\\StepperControl\\\\tests\\\\integration\\\\test_uart_hello.py\" -Force -Confirm:$false)"
+    ]
+  }
+}
