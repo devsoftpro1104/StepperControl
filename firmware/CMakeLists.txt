@@ -99,6 +99,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     src/hal_port/inc
     src/drivers/uart/inc
     src/middleware/protocol/inc
+    src/middleware/cli/inc
     src/config
     ${CMSIS_INC}
     ${CUBE_INC}

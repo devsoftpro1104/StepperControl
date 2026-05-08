@@ -1,0 +1,246 @@
+#include "cli.h"
+#include "uart.h"
+#include "app_state.h"
+#include "bsp_version.h"
+#include "project_config.h"
+
+#include "stm32f4xx.h"           /* NVIC_SystemReset */
+#include "FreeRTOS.h"
+#include "task.h"
+
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define CLI_LINE_MAX  128U
+#define CLI_MAX_ARGS  8
+
+static char     s_line[CLI_LINE_MAX];
+static uint16_t s_line_len;
+static bool     s_overflow;
+
+static volatile bool     s_telem_on   = false;
+static volatile uint16_t s_telem_rate = 50U;
+
+bool     cli_telem_enabled(void) { return s_telem_on; }
+uint16_t cli_telem_rate_hz(void) { return s_telem_rate; }
+
+static void cli_write(const char *s, uint16_t n) {
+    if (n) uart2_send((const uint8_t *)s, n);
+}
+
+static void cli_println(const char *s) {
+    cli_write(s, (uint16_t)strlen(s));
+    cli_write("\r\n", 2U);
+}
+
+static void cli_printf(const char *fmt, ...) {
+    char buf[128];
+    va_list ap;
+    va_start(ap, fmt);
+    int n = vsnprintf(buf, sizeof(buf), fmt, ap);
+    va_end(ap);
+    if (n < 0) return;
+    if (n >= (int)sizeof(buf)) n = (int)sizeof(buf) - 1;
+    cli_write(buf, (uint16_t)n);
+    cli_write("\r\n", 2U);
+}
+
+void cli_event(const char *fmt, ...) {
+    char buf[96];
+    buf[0] = '!';
+    va_list ap;
+    va_start(ap, fmt);
+    int n = vsnprintf(buf + 1, sizeof(buf) - 1, fmt, ap);
+    va_end(ap);
+    if (n < 0) return;
+    if (n > (int)sizeof(buf) - 2) n = (int)sizeof(buf) - 2;
+    cli_write(buf, (uint16_t)(n + 1));
+    cli_write("\r\n", 2U);
+}
+
+static const char *state_name(app_state_t s) {
+    switch (s) {
+        case APP_STATE_BOOT:   return "BOOT";
+        case APP_STATE_IDLE:   return "IDLE";
+        case APP_STATE_MOVING: return "MOVING";
+        case APP_STATE_FAULT:  return "FAULT";
+        default:               return "UNKNOWN";
+    }
+}
+
+static int tokenise(char *line, char *argv[], int max_argv) {
+    int argc = 0;
+    char *p = line;
+    while (*p && argc < max_argv) {
+        while (*p == ' ' || *p == '\t') *p++ = '\0';
+        if (!*p) break;
+        argv[argc++] = p;
+        while (*p && *p != ' ' && *p != '\t') p++;
+    }
+    return argc;
+}
+
+static void to_upper_inplace(char *s) {
+    for (; *s; ++s) if (*s >= 'a' && *s <= 'z') *s = (char)(*s - ('a' - 'A'));
+}
+
+static bool parse_long(const char *s, long *out) {
+    char *end = NULL;
+    long v = strtol(s, &end, 10);
+    if (end == s || end == NULL || *end != '\0') return false;
+    *out = v;
+    return true;
+}
+
+/* ---- handlers --------------------------------------------------------- */
+
+static void cmd_ping(int argc, char *argv[]) {
+    (void)argc; (void)argv;
+    cli_printf("+OK PING uptime=%lu", (unsigned long)xTaskGetTickCount());
+}
+
+static void cmd_ver(int argc, char *argv[]) {
+    (void)argc; (void)argv;
+    cli_printf("+OK VER %u.%u.%u",
+               (unsigned)FW_VERSION_MAJOR,
+               (unsigned)FW_VERSION_MINOR,
+               (unsigned)FW_VERSION_PATCH);
+}
+
+static void cmd_state(int argc, char *argv[]) {
+    (void)argc; (void)argv;
+    cli_printf("+OK STATE %s", state_name(app_state_get()));
+}
+
+static void cmd_move(int argc, char *argv[]) {
+    if (argc != 4) { cli_println("-ERR MOVE usage MOVE <steps> <speed> <accel>"); return; }
+    long steps, speed, accel;
+    if (!parse_long(argv[1], &steps) ||
+        !parse_long(argv[2], &speed) ||
+        !parse_long(argv[3], &accel)) {
+        cli_println("-ERR MOVE bad-number");
+        return;
+    }
+    if (speed <= 0 || (uint32_t)speed > PROJ_MOTOR_MAX_SPEED_SPS) {
+        cli_println("-ERR MOVE bad-speed");
+        return;
+    }
+    if (accel <= 0) { cli_println("-ERR MOVE bad-accel"); return; }
+    if (app_state_get() == APP_STATE_FAULT) { cli_println("-ERR MOVE fault"); return; }
+
+    /* TODO: реальный enqueue профиля движения в task_motor */
+    app_state_set(APP_STATE_MOVING);
+    cli_event("STATE MOVING");
+    cli_printf("+OK MOVE steps=%ld speed=%ld accel=%ld", steps, speed, accel);
+}
+
+static void cmd_stop(int argc, char *argv[]) {
+    (void)argc; (void)argv;
+    /* TODO: сигнал task_motor об аборте */
+    if (app_state_get() != APP_STATE_FAULT) {
+        app_state_set(APP_STATE_IDLE);
+        cli_event("STATE IDLE");
+    }
+    cli_println("+OK STOP");
+}
+
+static void cmd_telem(int argc, char *argv[]) {
+    if (argc < 2) { cli_println("-ERR TELEM usage TELEM ON|OFF|RATE <hz>"); return; }
+    to_upper_inplace(argv[1]);
+    if (strcmp(argv[1], "ON") == 0) {
+        s_telem_on = true;
+        cli_println("+OK TELEM ON");
+    } else if (strcmp(argv[1], "OFF") == 0) {
+        s_telem_on = false;
+        cli_println("+OK TELEM OFF");
+    } else if (strcmp(argv[1], "RATE") == 0) {
+        if (argc != 3) { cli_println("-ERR TELEM usage TELEM RATE <hz>"); return; }
+        long hz;
+        if (!parse_long(argv[2], &hz) || hz < 1 || hz > 1000) {
+            cli_println("-ERR TELEM bad-rate");
+            return;
+        }
+        s_telem_rate = (uint16_t)hz;
+        cli_printf("+OK TELEM RATE %ld", hz);
+    } else {
+        cli_println("-ERR TELEM bad-arg");
+    }
+}
+
+static void cmd_help(int argc, char *argv[]) {
+    (void)argc; (void)argv;
+    cli_println("+OK HELP cmds=PING,VER,STATE,MOVE,STOP,TELEM,HELP,RESET");
+    cli_println("# MOVE <steps:i32> <speed_sps:u32> <accel_sps2:u32>");
+    cli_println("# TELEM ON|OFF|RATE <hz:1..1000>");
+    cli_println("# stream:  $T,<ts_ms>,<pos>,<current>,<temp_c10>");
+    cli_println("# events:  !STATE <name>  !FAULT <reason>  !DONE <what>");
+}
+
+static void cmd_reset(int argc, char *argv[]) {
+    (void)argc; (void)argv;
+    /* uart2_send блокирующий — к моменту возврата ответ уже физически в линии. */
+    cli_println("+OK RESET");
+    NVIC_SystemReset();
+}
+
+/* ---- dispatch --------------------------------------------------------- */
+
+typedef struct {
+    const char *name;
+    void (*fn)(int argc, char *argv[]);
+} cli_cmd_t;
+
+static const cli_cmd_t s_cmds[] = {
+    { "PING",  cmd_ping  },
+    { "VER",   cmd_ver   },
+    { "STATE", cmd_state },
+    { "MOVE",  cmd_move  },
+    { "STOP",  cmd_stop  },
+    { "TELEM", cmd_telem },
+    { "HELP",  cmd_help  },
+    { "RESET", cmd_reset },
+};
+
+static void cli_dispatch(char *line) {
+    char *argv[CLI_MAX_ARGS];
+    int argc = tokenise(line, argv, CLI_MAX_ARGS);
+    if (argc == 0) return;
+    if (argv[0][0] == '#') return;            /* строка-комментарий — игнор */
+    to_upper_inplace(argv[0]);
+    for (size_t i = 0; i < sizeof(s_cmds) / sizeof(s_cmds[0]); ++i) {
+        if (strcmp(argv[0], s_cmds[i].name) == 0) {
+            s_cmds[i].fn(argc, argv);
+            return;
+        }
+    }
+    cli_printf("-ERR unknown %s", argv[0]);
+}
+
+void cli_init(void) {
+    s_line_len = 0;
+    s_overflow = false;
+    cli_printf("# stepper_control %u.%u.%u ready",
+               (unsigned)FW_VERSION_MAJOR,
+               (unsigned)FW_VERSION_MINOR,
+               (unsigned)FW_VERSION_PATCH);
+    cli_event("STATE %s", state_name(app_state_get()));
+}
+
+void cli_feed(uint8_t b) {
+    if (b == '\r' || b == '\n') {
+        if (s_overflow) {
+            cli_println("-ERR line-too-long");
+        } else if (s_line_len > 0) {
+            s_line[s_line_len] = '\0';
+            cli_dispatch(s_line);
+        }
+        s_line_len = 0;
+        s_overflow = false;
+        return;
+    }
+    if (s_overflow) return;
+    if (s_line_len >= CLI_LINE_MAX - 1U) { s_overflow = true; return; }
+    s_line[s_line_len++] = (char)b;
+}

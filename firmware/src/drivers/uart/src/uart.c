@@ -21,9 +21,21 @@
 /* Приоритет ISR: число должно быть ≥ configMAX_SYSCALL_INTERRUPT_PRIORITY/16 = 5,
    иначе FreeRTOS-«FromISR» API даст assert. */
 #define UART2_TX_DMA_PRIO    6U
+#define UART2_RX_IRQ_PRIO    6U
+
+/* Размер должен быть степенью двойки — индексы маскируются. */
+#define UART2_RX_BUF_SIZE    256U
+#define UART2_RX_BUF_MASK    (UART2_RX_BUF_SIZE - 1U)
 
 static osSemaphoreId_t s_tx_done;   /* TC от DMA → разбудить отправителя */
 static osMutexId_t     s_tx_mutex;  /* сериализуем вызовы send() из разных задач */
+
+/* SPSC ring: ISR — единственный writer (s_rx_head), задача — единственный reader (s_rx_tail).
+   Для такого паттерна не нужен критсек и не нужны атомики строже volatile на M4. */
+static volatile uint8_t  s_rx_buf[UART2_RX_BUF_SIZE];
+static volatile uint16_t s_rx_head;
+static volatile uint16_t s_rx_tail;
+static volatile uint32_t s_rx_overflows;
 
 /* Диагностика пути отправки. Читать в отладчике через watch:
      g_uart2_dbg.dma_tc      — растёт = DMA реально завершает трансферы
@@ -90,7 +102,11 @@ void uart2_init(void) {
 
     LL_USART_ConfigAsyncMode(USART2);
     LL_USART_EnableDMAReq_TX(USART2);   /* DMAT=1: TXE-события генерируют DMA-запросы */
+    LL_USART_EnableIT_RXNE(USART2);     /* RX через прерывание */
     LL_USART_Enable(USART2);
+
+    NVIC_SetPriority(USART2_IRQn, UART2_RX_IRQ_PRIO);
+    NVIC_EnableIRQ(USART2_IRQn);
 
     uart2_dma_init();
 
@@ -149,6 +165,39 @@ void uart2_send(const uint8_t *data, uint16_t len) {
 void uart2_send_string(const char *s) {
     if (s == NULL) return;
     uart2_send((const uint8_t *)s, (uint16_t)strlen(s));
+}
+
+int uart2_rx_get(uint8_t *out) {
+    uint16_t tail = s_rx_tail;
+    if (tail == s_rx_head) return 0;
+    *out = s_rx_buf[tail];
+    s_rx_tail = (uint16_t)((tail + 1U) & UART2_RX_BUF_MASK);
+    return 1;
+}
+
+uint32_t uart2_rx_overflows(void) { return s_rx_overflows; }
+
+void USART2_IRQHandler(void) {
+    /* ORE/FE/NE/PE сначала — без чтения SR/DR флаги не сбросятся, и IRQ зациклится. */
+    if (LL_USART_IsActiveFlag_ORE(USART2)) {
+        LL_USART_ClearFlag_ORE(USART2);
+        s_rx_overflows++;
+    }
+    if (LL_USART_IsActiveFlag_NE(USART2)) LL_USART_ClearFlag_NE(USART2);
+    if (LL_USART_IsActiveFlag_FE(USART2)) LL_USART_ClearFlag_FE(USART2);
+    if (LL_USART_IsActiveFlag_PE(USART2)) LL_USART_ClearFlag_PE(USART2);
+
+    if (LL_USART_IsActiveFlag_RXNE(USART2)) {
+        uint8_t b = LL_USART_ReceiveData8(USART2);
+        uint16_t head = s_rx_head;
+        uint16_t next = (uint16_t)((head + 1U) & UART2_RX_BUF_MASK);
+        if (next != s_rx_tail) {
+            s_rx_buf[head] = b;
+            s_rx_head = next;
+        } else {
+            s_rx_overflows++;     /* ring full → байт теряется */
+        }
+    }
 }
 
 void DMA1_Stream6_IRQHandler(void) {

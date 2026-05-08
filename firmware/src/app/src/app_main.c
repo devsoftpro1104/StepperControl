@@ -28,13 +28,14 @@ void app_run(void) {
 
     osThreadAttr_t a;
 
-    a = s_attr_default; a.name = "protocol";
+    /* protocol/telem делают snprintf — стек 512 для newlib-nano мал, поднимаем до 1024. */
+    a = s_attr_default; a.name = "protocol"; a.stack_size = 1024;
     osThreadNew(task_protocol,   NULL, &a);
 
     a = s_attr_default; a.name = "motor"; a.priority = osPriorityAboveNormal;
     osThreadNew(task_motor,      NULL, &a);
 
-    a = s_attr_default; a.name = "telem";
+    a = s_attr_default; a.name = "telem"; a.stack_size = 1024;
     osThreadNew(task_telemetry,  NULL, &a);
 
     a = s_attr_default; a.name = "diag";
