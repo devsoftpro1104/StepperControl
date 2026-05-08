@@ -22,4 +22,8 @@
 #define PIN_USART2_RX_PIN      LL_GPIO_PIN_3
 #define PIN_USART2_AF          LL_GPIO_AF_7
 
+/* DS18B20 (1-Wire). Open-drain + внешний 4.7к pull-up к 3.3 В обязателен. */
+#define PIN_DS18B20_PORT       GPIOB
+#define PIN_DS18B20_PIN        LL_GPIO_PIN_12
+
 #endif /* BSP_PINS_H */

@@ -2,6 +2,7 @@
 #include "bsp_clock.h"
 #include "bsp_pins.h"
 #include "uart.h"
+#include "ds18b20.h"
 #include "stm32f4xx_ll_bus.h"
 #include "stm32f4xx_ll_gpio.h"
 
@@ -33,4 +34,5 @@ void bsp_init(void) {
     bsp_clock_init_168mhz_hse();
     bsp_gpio_init();
     uart2_init();
+    ds18b20_init();    /* DWT + GPIOB12 open-drain; реальное чтение — из task_diagnostic */
 }

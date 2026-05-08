@@ -7,9 +7,11 @@
 
 #include "uart.h"
 #include "cli.h"
+#include "temp_service.h"
 
 #include <stdio.h>
 #include <stdint.h>
+#include <stdbool.h>
 
 void task_telemetry(void *argument) {
     (void)argument;
@@ -25,15 +27,19 @@ void task_telemetry(void *argument) {
             uint32_t ts  = (uint32_t)xTaskGetTickCount();
             int32_t  pos = 0;        /* TODO: реальная позиция от драйвера мотора */
             uint16_t cur = 0U;       /* TODO: ADC ток */
-            int16_t  t10 = 0;        /* TODO: датчик температуры × 10 */
+            int16_t  t10 = 0;        /* DS18B20: свежее значение из temp_service */
+            (void)temp_service_get_last(&t10, NULL);
 
-            char buf[48];
+            char tstr[8];
+            temp_format_c10(tstr, sizeof(tstr), t10);
+
+            char buf[64];
             int n = snprintf(buf, sizeof(buf),
-                             "$T,%lu,%ld,%u,%d\r\n",
+                             "$T, %lu, %ld, %u, %s\r\n",
                              (unsigned long)ts,
                              (long)pos,
                              (unsigned)cur,
-                             (int)t10);
+                             tstr);
             if (n > 0) {
                 if (n >= (int)sizeof(buf)) n = (int)sizeof(buf) - 1;
                 uart2_send((const uint8_t *)buf, (uint16_t)n);

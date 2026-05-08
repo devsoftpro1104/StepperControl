@@ -98,6 +98,8 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     src/bsp/inc
     src/hal_port/inc
     src/drivers/uart/inc
+    src/drivers/onewire/inc
+    src/devices/ds18b20/inc
     src/middleware/protocol/inc
     src/middleware/cli/inc
     src/config

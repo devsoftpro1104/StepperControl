@@ -3,6 +3,8 @@
 #include "app_state.h"
 #include "bsp_version.h"
 #include "project_config.h"
+#include "temp_service.h"
+#include "ds18b20.h"
 
 #include "stm32f4xx.h"           /* NVIC_SystemReset */
 #include "FreeRTOS.h"
@@ -169,12 +171,61 @@ static void cmd_telem(int argc, char *argv[]) {
     }
 }
 
+static void cmd_temp(int argc, char *argv[]) {
+    if (argc < 2) { cli_println("-ERR TEMP usage TEMP READ|START|STOP|PERIOD <ms>"); return; }
+    to_upper_inplace(argv[1]);
+
+    if (strcmp(argv[1], "READ") == 0) {
+        /* Синхронное чтение: блокирует CLI на ≈770 мс. Допустимо — CLI
+           обрабатывается в task_protocol, остальные задачи продолжают работать. */
+        int16_t c10;
+        ds18b20_status_t st = ds18b20_read_blocking(&c10);
+        switch (st) {
+            case DS18B20_OK: {
+                temp_service_publish(c10);
+                char tstr[8];
+                temp_format_c10(tstr, sizeof(tstr), c10);
+                cli_printf("+OK TEMP %s", tstr);
+                break;
+            }
+            case DS18B20_NO_DEVICE: cli_println("-ERR TEMP no-device"); break;
+            case DS18B20_BAD_CRC:   cli_println("-ERR TEMP bad-crc");   break;
+            case DS18B20_BAD_VALUE: cli_println("-ERR TEMP bad-value"); break;
+            default:                cli_println("-ERR TEMP unknown");   break;
+        }
+    } else if (strcmp(argv[1], "START") == 0) {
+        temp_service_start();
+        cli_println("+OK TEMP START");
+    } else if (strcmp(argv[1], "STOP") == 0) {
+        temp_service_stop();
+        cli_println("+OK TEMP STOP");
+    } else if (strcmp(argv[1], "PERIOD") == 0) {
+        if (argc != 3) { cli_println("-ERR TEMP usage TEMP PERIOD <ms>"); return; }
+        long ms;
+        if (!parse_long(argv[2], &ms) || ms <= 0) {
+            cli_println("-ERR TEMP bad-number");
+            return;
+        }
+        if (!temp_service_set_period_ms((uint32_t)ms)) {
+            cli_printf("-ERR TEMP bad-period min=%u max=%u",
+                       (unsigned)TEMP_PERIOD_MIN_MS,
+                       (unsigned)TEMP_PERIOD_MAX_MS);
+            return;
+        }
+        cli_printf("+OK TEMP PERIOD %ld", ms);
+    } else {
+        cli_println("-ERR TEMP bad-arg");
+    }
+}
+
 static void cmd_help(int argc, char *argv[]) {
     (void)argc; (void)argv;
-    cli_println("+OK HELP cmds=PING,VER,STATE,MOVE,STOP,TELEM,HELP,RESET");
+    cli_println("+OK HELP cmds=PING,VER,STATE,MOVE,STOP,TELEM,TEMP,HELP,RESET");
     cli_println("# MOVE <steps:i32> <speed_sps:u32> <accel_sps2:u32>");
     cli_println("# TELEM ON|OFF|RATE <hz:1..1000>");
-    cli_println("# stream:  $T,<ts_ms>,<pos>,<current>,<temp_c10>");
+    cli_println("# TEMP READ|START|STOP|PERIOD <ms:800..60000>");
+    cli_println("# stream:  $T, <ts_ms>, <pos>, <current>, <temp_c>");
+    cli_println("# stream:  $T18, <ts_ms>, <temp_c>     (DS18B20)");
     cli_println("# events:  !STATE <name>  !FAULT <reason>  !DONE <what>");
 }
 
@@ -199,6 +250,7 @@ static const cli_cmd_t s_cmds[] = {
     { "MOVE",  cmd_move  },
     { "STOP",  cmd_stop  },
     { "TELEM", cmd_telem },
+    { "TEMP",  cmd_temp  },
     { "HELP",  cmd_help  },
     { "RESET", cmd_reset },
 };
