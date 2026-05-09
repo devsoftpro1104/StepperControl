@@ -34,6 +34,9 @@ def main() -> int:
     model.motor_sample_received.connect(view.on_motor_sample)
     model.temp_sample_received.connect(view.on_temp_sample)
     model.hall_sample_received.connect(view.on_hall_sample)
+    model.ok_received.connect(view.on_ok)
+    model.err_received.connect(view.on_err)
+    model.event_received.connect(view.on_event)
 
     # ---- view -> controller ----
     view.connect_requested.connect(controller.connect_to)

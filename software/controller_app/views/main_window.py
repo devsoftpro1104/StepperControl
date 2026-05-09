@@ -154,6 +154,15 @@ class MainWindow(QMainWindow):
     def on_hall_sample(self, sample) -> None:
         self.sensors_tab.on_hall_sample(sample)
 
+    def on_ok(self, payload: str) -> None:
+        self.terminal_tab.on_ok(payload)
+
+    def on_err(self, payload: str) -> None:
+        self.terminal_tab.on_err(payload)
+
+    def on_event(self, tag: str, args: str) -> None:
+        self.terminal_tab.on_event(tag, args)
+
     # ---- shortcuts ----------------------------------------------------
 
     def keyPressEvent(self, event) -> None:  # noqa: N802 (Qt naming)

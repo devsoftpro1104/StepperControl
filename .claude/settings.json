@@ -28,7 +28,8 @@
       "PowerShell(cmake --build firmware/build/debug 2>&1)"
     ],
     "additionalDirectories": [
-      "C:\\Users\\admin\\.claude\\projects\\c--STM32-StepperControl"
+      "C:\\Users\\admin\\.claude\\projects\\c--STM32-StepperControl",
+      "c:\\Users\\admin\\Pictures\\Blue pill"
     ]
   }
 }

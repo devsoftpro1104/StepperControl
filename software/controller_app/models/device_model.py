@@ -31,6 +31,11 @@ class DeviceModel(QObject):
     hall_sample_received  = Signal(object)
     probe_sample_received = Signal(object)
 
+    # Ответы и async-события прошивки — для CSV-очереди в TerminalTab.
+    ok_received    = Signal(str)              # payload без префикса "+OK "
+    err_received   = Signal(str)              # payload без префикса "-ERR "
+    event_received = Signal(str, str)         # tag, args (от "!TAG args")
+
     def __init__(self, parent: Optional[QObject] = None) -> None:
         super().__init__(parent)
         self._connected: bool = False
@@ -80,3 +85,12 @@ class DeviceModel(QObject):
 
     def push_probe_sample(self, sample: object) -> None:
         self.probe_sample_received.emit(sample)
+
+    def push_ok(self, payload: str) -> None:
+        self.ok_received.emit(payload)
+
+    def push_err(self, payload: str) -> None:
+        self.err_received.emit(payload)
+
+    def push_event(self, tag: str, args: str) -> None:
+        self.event_received.emit(tag, args)

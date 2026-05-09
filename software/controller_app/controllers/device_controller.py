@@ -110,12 +110,15 @@ class DeviceController(QObject):
             if self._probe.feed_ok(evt.payload) and self._probe.complete:
                 self._emit_dump()
             self._model.append_log(f"+OK {evt.payload}", LogSeverity.OK)
+            self._model.push_ok(evt.payload)
             return
         if isinstance(evt, ErrEvent):
             self._model.append_log(f"-ERR {evt.payload}", LogSeverity.ERR)
+            self._model.push_err(evt.payload)
             return
         if isinstance(evt, AsyncEvent):
             self._model.append_log(f"!{evt.tag} {evt.args}".rstrip(), LogSeverity.EVENT)
+            self._model.push_event(evt.tag, evt.args)
             return
         if isinstance(evt, CommentEvent):
             self._model.append_log(f"# {evt.text}", LogSeverity.CMT)
