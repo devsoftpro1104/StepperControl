@@ -101,7 +101,7 @@ verb'ов:
 | `STOP`                               | `+OK STOP`                                | —                                     |
 | `HOME`                               | (`-ERR HOME not-implemented`)             | `not-implemented` (TBD)               |
 | `EN ON\|OFF`                         | `+OK EN ON` / `+OK EN OFF`                | `bad-arg`                             |
-| `DIR CW\|CCW`                        | `+OK DIR CW` / `+OK DIR CCW`              | `bad-arg`                             |
+| `DIR FRW\|BCK`                       | `+OK DIR FRW` / `+OK DIR BCK`             | `bad-arg`                             |
 
 `EN` и `DIR` напрямую дёргают GPIO **PA10** (active-LOW) и **PA9**
 соответственно — это нужно для bring-up'а внешнего драйвера до того, как
@@ -137,7 +137,7 @@ $M, <ts_ms>, <pos>, <speed_sps>, <target>, <en>, <dir>\r\n
 | `speed_sps` | `uint32` | текущая скорость, шагов/с (TBD)          |
 | `target`    | `int32`  | целевая позиция (TBD)                    |
 | `en`        | `0\|1`   | состояние линии EN (1 = драйвер активен) |
-| `dir`       | `0\|1`   | 0 = CW, 1 = CCW                          |
+| `dir`       | `0\|1`   | 0 = FRW (по часовой), 1 = BCK (против)   |
 
 Сейчас `pos`/`speed`/`target` всегда нули — реализуются вместе с
 профилировщиком.

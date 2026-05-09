@@ -18,9 +18,15 @@
 #define MOTOR_RATE_MIN_HZ      1U
 #define MOTOR_RATE_MAX_HZ     50U
 
+/* FRW (forward)  = вращение по часовой стрелке (PIN_DIR LOW)
+   BCK (backward) = против часовой                (PIN_DIR HIGH).
+   Раньше эти направления назывались CW/CCW; перешли на FRW/BCK,
+   потому что для пользователя «вперёд/назад» однозначнее, чем «по/против
+   часовой» (зависит от того, с какого торца смотришь на мотор). Полярность
+   GPIO не менялась — только имена. */
 typedef enum {
-    MOTOR_DIR_CW  = 0,
-    MOTOR_DIR_CCW = 1,
+    MOTOR_DIR_FRW = 0,
+    MOTOR_DIR_BCK = 1,
 } motor_dir_t;
 
 void        motor_service_init(void);

@@ -2,7 +2,7 @@
 
   - DigitalReadout — большое моноширинное число с цианистым свечением.
                      Используется для POSITION (steps) на вкладке мотора.
-  - DirReadout     — индикатор направления (CW / CCW / STOP) с цветами.
+  - DirReadout     — индикатор направления (FRW / BCK / STOP) с цветами.
   - FreqReadout    — компактные 4 цифры частоты PUL.
 """
 
@@ -82,11 +82,16 @@ class FreqReadout(QLabel):
 
 
 class DirReadout(QLabel):
-    """Индикатор направления: CW / CCW / STOP, цветной."""
+    """Индикатор направления: FRW / BCK / STOP, цветной.
+
+    FRW (forward, по часовой)  — зелёный.
+    BCK (backward, против)     — янтарный.
+    STOP                        — серый.
+    """
 
     _COLORS = {
-        "CW":   COL_GRN,
-        "CCW":  COL_AMBER,
+        "FRW":  COL_GRN,
+        "BCK":  COL_AMBER,
         "STOP": COL_TEXT_DIM,
     }
 

@@ -130,8 +130,8 @@ class CliControlPanel(QWidget):
         row.addWidget(self._btn("OFF", "EN OFF"))
         row.addSpacing(20)
         row.addWidget(self._lbl("DIR"))
-        row.addWidget(self._btn("CW",  "DIR CW"))
-        row.addWidget(self._btn("CCW", "DIR CCW"))
+        row.addWidget(self._btn("FRW", "DIR FRW"))
+        row.addWidget(self._btn("BCK", "DIR BCK"))
         row.addStretch(1)
         p.add_layout(row)
         return p

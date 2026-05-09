@@ -22,7 +22,7 @@ static volatile int32_t  s_target     = 0;
 static volatile uint32_t s_speed_sps  = 0;
 
 static volatile bool        s_en      = false;
-static volatile motor_dir_t s_dir     = MOTOR_DIR_CW;
+static volatile motor_dir_t s_dir     = MOTOR_DIR_FRW;
 
 /* Оркестрация движения. Все эти поля пишутся ТОЛЬКО из контекста, который
    уже эксклюзивно владеет motor_service (либо task_motor, либо команда CLI
@@ -35,9 +35,9 @@ void motor_service_init(void) {
     s_running   = false;
     s_period_ms = MOTOR_PERIOD_DEFAULT;
     /* GPIO PA9/PA10 уже инициализированы как PUSH-PULL outputs в bsp.c.
-       Сразу выставим логические дефолты: EN=OFF (driver disabled), DIR=CW. */
+       Сразу выставим логические дефолты: EN=OFF (driver disabled), DIR=FRW. */
     motor_service_set_en (false);
-    motor_service_set_dir(MOTOR_DIR_CW);
+    motor_service_set_dir(MOTOR_DIR_FRW);
 }
 
 bool     motor_service_running(void)    { return s_running; }
@@ -77,8 +77,8 @@ motor_dir_t motor_service_dir(void) { return s_dir; }
 
 void motor_service_set_dir(motor_dir_t d) {
     s_dir = d;
-    if (d == MOTOR_DIR_CW) LL_GPIO_ResetOutputPin(PIN_DIR_PORT, PIN_DIR_PIN);
-    else                   LL_GPIO_SetOutputPin  (PIN_DIR_PORT, PIN_DIR_PIN);
+    if (d == MOTOR_DIR_FRW) LL_GPIO_ResetOutputPin(PIN_DIR_PORT, PIN_DIR_PIN);
+    else                    LL_GPIO_SetOutputPin  (PIN_DIR_PORT, PIN_DIR_PIN);
 }
 
 void motor_service_register_owner(void *task_handle) {
@@ -91,7 +91,7 @@ motor_result_t motor_service_move(int32_t steps, uint32_t speed_sps) {
     if (steps == 0)                         return MOTOR_ERR_BAD_STEPS;
     if (!step_pwm_set_speed_sps(speed_sps)) return MOTOR_ERR_BAD_SPEED;
 
-    motor_dir_t  d = (steps > 0) ? MOTOR_DIR_CW : MOTOR_DIR_CCW;
+    motor_dir_t  d = (steps > 0) ? MOTOR_DIR_FRW : MOTOR_DIR_BCK;
     motor_service_set_dir(d);
     motor_service_set_en(true);
 

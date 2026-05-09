@@ -273,7 +273,7 @@ static void cmd_motor(int argc, char *argv[]) {
                      (unsigned long)motor_service_speed_sps(),
                      (long)motor_service_target(),
                      motor_service_en() ? "on" : "off",
-                     motor_service_dir() == MOTOR_DIR_CW ? "cw" : "ccw");
+                     motor_service_dir() == MOTOR_DIR_FRW ? "frw" : "bck");
     } else if (strcmp(argv[1], "ON") == 0) {
         motor_service_start();
         shell_println("+OK MOTOR ON");
@@ -314,14 +314,14 @@ static void cmd_en(int argc, char *argv[]) {
 }
 
 static void cmd_dir(int argc, char *argv[]) {
-    if (argc != 2) { shell_println("-ERR DIR usage DIR CW|CCW"); return; }
+    if (argc != 2) { shell_println("-ERR DIR usage DIR FRW|BCK"); return; }
     to_upper_inplace(argv[1]);
-    if (strcmp(argv[1], "CW") == 0) {
-        motor_service_set_dir(MOTOR_DIR_CW);
-        shell_println("+OK DIR CW");
-    } else if (strcmp(argv[1], "CCW") == 0) {
-        motor_service_set_dir(MOTOR_DIR_CCW);
-        shell_println("+OK DIR CCW");
+    if (strcmp(argv[1], "FRW") == 0) {
+        motor_service_set_dir(MOTOR_DIR_FRW);
+        shell_println("+OK DIR FRW");
+    } else if (strcmp(argv[1], "BCK") == 0) {
+        motor_service_set_dir(MOTOR_DIR_BCK);
+        shell_println("+OK DIR BCK");
     } else {
         shell_println("-ERR DIR bad-arg");
     }
@@ -430,7 +430,7 @@ static void cmd_help(int argc, char *argv[]) {
     shell_println("# MOVETO <pos:i32>                                    (TBD)");
     shell_println("# HOME                                                (TBD)");
     shell_println("# EN     ON|OFF                                       (GPIO PA10)");
-    shell_println("# DIR    CW|CCW                                       (GPIO PA9)");
+    shell_println("# DIR    FRW|BCK                                      (GPIO PA9, FRW=CW)");
     shell_println("# MOTOR  ON|OFF|RATE <hz:1..50>|READ                  -> $M");
     shell_println("# TEMP   ON|OFF|RATE <hz:1..1>|READ                   -> $T18 (DS18B20)");
     shell_println("# HALL   ON|OFF|RATE <hz:1..100>|READ|ZERO|ZEROCLR    -> $H   (AH49E)");

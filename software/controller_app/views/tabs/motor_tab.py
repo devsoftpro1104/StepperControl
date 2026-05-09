@@ -4,7 +4,7 @@ Layout:
     ┌────────────────────────┬───────────────────────────┐
     │                        │  POSITION   +0001234      │
     │    [ ANIMATED ROTOR ]  │  SPEED      0500 Hz       │
-    │                        │  DIR        CW            │
+    │                        │  DIR        FRW           │
     │                        │  ENABLE     ON            │
     ├────────────────────────┴───────────────────────────┤
     │  ▼ PROBE DUMP WAVEFORM ─────────────────────────── │
@@ -76,14 +76,20 @@ class MotorTab(QWidget):
         self.freq.set_value(abs(sample.speed_sps))
 
         if sample.speed_sps > 0:
-            self.dir.set_dir("CW")
+            self.dir.set_dir("FRW")
             self.rotor.set_freq_dir(abs(sample.speed_sps), 1)
         elif sample.speed_sps < 0:
-            self.dir.set_dir("CCW")
+            self.dir.set_dir("BCK")
             self.rotor.set_freq_dir(abs(sample.speed_sps), -1)
         else:
             self.dir.set_dir("STOP")
             self.rotor.set_freq_dir(0, 0)
+
+        # Якорим угол ротора к фактической позиции мотора. Это снимает дрейф,
+        # который накопила бы интерполяция по speed между $M (10 Гц по дефолту),
+        # и гарантирует «при запуске программы — позиция 0»: первый $M обычно
+        # приходит с pos=0, а до этого _angle уже 0 в __init__.
+        self.rotor.set_position(sample.pos)
 
         self._style_ena(bool(sample.en))
 

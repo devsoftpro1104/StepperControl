@@ -9,7 +9,7 @@
 | Сигнал   | Пин MCU | Режим                                                  | Полярность     |
 |----------|---------|--------------------------------------------------------|----------------|
 | STEP     | **PA8** | Alt-function **AF1 (TIM1_CH1)**, push-pull, PWM        | передний фронт = 1 шаг |
-| DIR      | **PA9** | GPIO out, push-pull                                    | 0 = CW, 1 = CCW |
+| DIR      | **PA9** | GPIO out, push-pull                                    | 0 = FRW (по часовой), 1 = BCK (против) |
 | EN       | **PA10**| GPIO out, push-pull                                    | **active-LOW**: pin LOW = драйвер включён |
 
 Источник правды — [`bsp_pins.h`](../firmware/src/bsp/inc/bsp_pins.h).
@@ -143,8 +143,8 @@ TBD.
 |---------------|-------------------------------------------|-------|
 | `EN ON`       | Установить EN=LOW (драйвер включён)       | `+OK EN ON`  |
 | `EN OFF`      | Установить EN=HIGH (driver disabled)      | `+OK EN OFF` |
-| `DIR CW`      | Установить DIR=LOW                        | `+OK DIR CW` |
-| `DIR CCW`     | Установить DIR=HIGH                       | `+OK DIR CCW`|
+| `DIR FRW`     | Установить DIR=LOW (по часовой)           | `+OK DIR FRW` |
+| `DIR BCK`     | Установить DIR=HIGH (против часовой)      | `+OK DIR BCK` |
 
 `EN`/`DIR` дёргают GPIO напрямую. `motor_service_move()` в начале своего
 исполнения сам выставит `EN ON` и нужное направление, так что эти команды

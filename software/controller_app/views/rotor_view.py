@@ -55,6 +55,16 @@ class RotorView(QWidget):
         self._dir_sign = 1 if dir_sign > 0 else (-1 if dir_sign < 0 else 0)
         self._running  = (self._freq_hz > 0 and self._dir_sign != 0)
 
+    def set_position(self, pos_steps: int) -> None:
+        """Привязать угол ротора к фактической позиции мотора (в шагах).
+        pos % STEPS_PER_REV → угол в градусах. На запуске firmware публикует
+        pos=0, поэтому ротор стоит на 0°. Если на это значение наложилась бы
+        интерполяция по speed (set_freq_dir), якорь её сносит — и дрейф между
+        $M-семплами не накапливается."""
+        deg_per_step = 360.0 / STEPS_PER_REV
+        self._angle = (int(pos_steps) % STEPS_PER_REV) * deg_per_step
+        self.update()
+
     # ---- интерполяция -------------------------------------------------
 
     def _tick(self) -> None:
@@ -151,7 +161,7 @@ class RotorView(QWidget):
         # ------- индикаторная риска -------
         p.save()
         p.translate(cx, cy)
-        p.rotate(self._angle - 90)              # 0° => вверх; +угол => CW
+        p.rotate(self._angle - 90)              # 0° => вверх; +угол => FRW (по часовой)
         mark_len   = r_disk * 0.78
         mark_inner = r_disk * 0.22
         mark_w     = max(6, int(side * 0.022))
