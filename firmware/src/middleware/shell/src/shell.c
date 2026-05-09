@@ -264,8 +264,16 @@ static void cmd_hall(int argc, char *argv[]) {
 /* --- MOTOR: телеметрия + bring-up GPIO --------------------------------- */
 
 static void cmd_motor(int argc, char *argv[]) {
-    if (argc < 2) { shell_println("-ERR MOTOR usage MOTOR ON|OFF|RATE <hz>|READ"); return; }
+    if (argc < 2) { shell_println("-ERR MOTOR usage MOTOR ON|OFF|RATE <hz>|READ|ZERO"); return; }
     to_upper_inplace(argv[1]);
+
+    if (strcmp(argv[1], "ZERO") == 0) {
+        /* Безопасно: сначала прерываем любое движение, потом обнуляем. */
+        motor_service_abort();
+        motor_service_position_zero();
+        shell_println("+OK MOTOR ZERO pos=0");
+        return;
+    }
 
     if (strcmp(argv[1], "READ") == 0) {
         shell_printf("+OK MOTOR pos=%ld speed=%lu target=%ld en=%s dir=%s",
@@ -431,7 +439,7 @@ static void cmd_help(int argc, char *argv[]) {
     shell_println("# HOME                                                (TBD)");
     shell_println("# EN     ON|OFF                                       (GPIO PA10)");
     shell_println("# DIR    FRW|BCK                                      (GPIO PA9, FRW=CW)");
-    shell_println("# MOTOR  ON|OFF|RATE <hz:1..50>|READ                  -> $M");
+    shell_println("# MOTOR  ON|OFF|RATE <hz:1..50>|READ|ZERO             -> $M");
     shell_println("# TEMP   ON|OFF|RATE <hz:1..1>|READ                   -> $T18 (DS18B20)");
     shell_println("# HALL   ON|OFF|RATE <hz:1..100>|READ|ZERO|ZEROCLR    -> $H   (AH49E)");
     shell_println("# PROBE  ON|OFF|RATE <hz:1..50>|READ|DUMP             -> $P / $D");

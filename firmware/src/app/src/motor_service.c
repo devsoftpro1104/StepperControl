@@ -122,3 +122,8 @@ void motor_service_abort(void) {
     s_target    = s_position;                  /* мы там, где остановились */
     s_speed_sps = 0;
 }
+
+void motor_service_position_zero(void) {
+    s_position = 0;
+    s_target   = 0;
+}

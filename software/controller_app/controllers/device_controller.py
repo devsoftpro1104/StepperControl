@@ -73,10 +73,23 @@ class DeviceController(QObject):
 
     # ---- слоты воркера ------------------------------------------------
 
+    INIT_SEQUENCE = (
+        "MOTOR ZERO",     # обнулить счётчик шагов (требует перепрошитой firmware)
+        "MOTOR ON",       # $M-стрим
+        "TEMP ON",        # $T18-стрим
+        "HALL ON",        # $H-стрим
+        "HALL ZERO",      # калибровка нуля Hall-датчика
+    )
+
     @Slot(str)
     def _on_serial_connected(self, port: str) -> None:
         self._model.append_log(f"[connected to {port} @ {self.BAUD}]", LogSeverity.OK)
         self._model.set_connection(True, port)
+        # Init sequence: каждая команда отдельной строкой. Если одна
+        # неизвестна старой прошивке (-ERR unknown), остальные всё равно
+        # отрабатывают.
+        for cmd in self.INIT_SEQUENCE:
+            self.send_command(cmd)
 
     @Slot()
     def _on_serial_disconnected(self) -> None:

@@ -72,6 +72,11 @@ motor_result_t motor_service_move(int32_t steps, uint32_t speed_sps);
 /* Немедленный обрыв текущего движения. Безопасно вызывать всегда. */
 void        motor_service_abort(void);
 
+/* Обнулить s_position и s_target. Вызывать только когда мотор не движется
+   (после motor_service_abort или в IDLE) — иначе sync затрёт значение
+   через долю секунды. */
+void        motor_service_position_zero(void);
+
 /* Обновить s_position по фактически выпущенным шагам. Вызывается ТОЛЬКО
    из task_motor (одиночный writer для s_position). */
 void        motor_service_sync_position_from_pwm(void);
