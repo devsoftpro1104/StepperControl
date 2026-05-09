@@ -50,20 +50,17 @@ class RotorView(QWidget):
         self.update()
 
     def set_freq_dir(self, freq_hz: float, dir_sign: int) -> None:
-        """freq_hz — модуль; dir_sign — −1 / 0 / +1."""
+        """freq_hz — модуль; dir_sign — −1 / 0 / +1.
+
+        При остановке (freq=0 или dir=0) угол сбрасывается на 0° — риска
+        всегда возвращается «вверх», независимо от того, где остановился
+        физический ротор. Это базовое состояние «по умолчанию»."""
         self._freq_hz  = float(abs(freq_hz))
         self._dir_sign = 1 if dir_sign > 0 else (-1 if dir_sign < 0 else 0)
         self._running  = (self._freq_hz > 0 and self._dir_sign != 0)
-
-    def set_position(self, pos_steps: int) -> None:
-        """Привязать угол ротора к фактической позиции мотора (в шагах).
-        pos % STEPS_PER_REV → угол в градусах. На запуске firmware публикует
-        pos=0, поэтому ротор стоит на 0°. Если на это значение наложилась бы
-        интерполяция по speed (set_freq_dir), якорь её сносит — и дрейф между
-        $M-семплами не накапливается."""
-        deg_per_step = 360.0 / STEPS_PER_REV
-        self._angle = (int(pos_steps) % STEPS_PER_REV) * deg_per_step
-        self.update()
+        if not self._running:
+            self._angle = 0.0
+            self.update()
 
     # ---- интерполяция -------------------------------------------------
 
@@ -140,7 +137,7 @@ class RotorView(QWidget):
 
         # ------- conical-«след» при вращении -------
         if self._running and self._dir_sign != 0:
-            cg = QConicalGradient(cx, cy, -90 - self._angle)
+            cg = QConicalGradient(cx, cy, 90 - self._angle)
             tail_col    = QColor(COL_DIGITAL); tail_col.setAlpha(110)
             transparent = QColor(COL_DIGITAL); transparent.setAlpha(0)
             if self._dir_sign > 0:
@@ -161,7 +158,7 @@ class RotorView(QWidget):
         # ------- индикаторная риска -------
         p.save()
         p.translate(cx, cy)
-        p.rotate(self._angle - 90)              # 0° => вверх; +угол => FRW (по часовой)
+        p.rotate(self._angle)                   # 0° => вверх; +угол => FRW (по часовой)
         mark_len   = r_disk * 0.78
         mark_inner = r_disk * 0.22
         mark_w     = max(6, int(side * 0.022))

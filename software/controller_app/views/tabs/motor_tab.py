@@ -85,12 +85,6 @@ class MotorTab(QWidget):
             self.dir.set_dir("STOP")
             self.rotor.set_freq_dir(0, 0)
 
-        # Якорим угол ротора к фактической позиции мотора. Это снимает дрейф,
-        # который накопила бы интерполяция по speed между $M (10 Гц по дефолту),
-        # и гарантирует «при запуске программы — позиция 0»: первый $M обычно
-        # приходит с pos=0, а до этого _angle уже 0 в __init__.
-        self.rotor.set_position(sample.pos)
-
         self._style_ena(bool(sample.en))
 
     def show_dump(self, samples, sample_hz: int) -> None:
