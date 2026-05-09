@@ -39,8 +39,7 @@ class SensorsTab(QWidget):
         self.probe = DumpChart(
             y_min=0, y_max=3.3,
             y_step_major=0.5, y_step_minor=0.1,
-            axis_label="V", unit_label="V",
-            value_fmt="{:+5.2f}", tick_fmt="{:.1f}",
+            axis_label="V", tick_fmt="{:.1f}",
             zero_line=False,
         )
 

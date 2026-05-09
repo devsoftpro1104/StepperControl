@@ -3,6 +3,10 @@
 Та же тёмная коробка с цианистым фосфорным трейсом, сеткой и большим
 readout'ом, что и в `ScopeChart`. Но вместо rolling-окна по wall-clock
 здесь жёстко-длинный снимок: ось X = время от 0 до n/sample_hz.
+
+Большой readout — измеренная частота STEP-импульсов: ищем восходящие
+фронты по пересечению средней линии (амплитуда / 2), считаем средний
+период между ними и выводим Hz + T в µs.
 """
 
 from __future__ import annotations
@@ -36,8 +40,6 @@ class DumpChart(QWidget):
         y_step_major: float = 0.5,
         y_step_minor: float = 0.1,
         axis_label: str = "V",
-        unit_label: str = "V",
-        value_fmt: str = "{:+5.2f}",
         tick_fmt: str  = "{:+.1f}",
         zero_line: bool = False,
         parent: Optional[QWidget] = None,
@@ -48,15 +50,14 @@ class DumpChart(QWidget):
         self._step_major = float(y_step_major)
         self._step_minor = float(y_step_minor)
         self._axis_label = axis_label
-        self._unit_label = unit_label
-        self._value_fmt  = value_fmt
         self._tick_fmt   = tick_fmt
         self._zero_line  = zero_line and y_min <= 0 <= y_max
 
         self._t_us: Optional[np.ndarray] = None
         self._v:    Optional[np.ndarray] = None
-        self._t_max_us: float = 0.0
-        self._peak: float = (y_min + y_max) / 2.0
+        self._t_max_us:  float = 0.0
+        self._freq_hz:   float = 0.0
+        self._period_us: float = 0.0
         self._has_data: bool = False
 
         self.setMinimumSize(560, 140)
@@ -76,7 +77,7 @@ class DumpChart(QWidget):
         self._t_us = t_us
         self._v    = v
         self._t_max_us = float(t_us[-1]) if n > 1 else 1.0
-        self._peak = float(v[-1])
+        self._freq_hz, self._period_us = self._measure_freq(samples, sample_hz)
         self._has_data = True
         self.update()
 
@@ -84,8 +85,36 @@ class DumpChart(QWidget):
         self._t_us = None
         self._v    = None
         self._t_max_us = 0.0
+        self._freq_hz   = 0.0
+        self._period_us = 0.0
         self._has_data = False
         self.update()
+
+    @staticmethod
+    def _measure_freq(samples: np.ndarray, sample_hz: int) -> tuple[float, float]:
+        """Восходящие фронты по midpoint-порогу → средний период → freq.
+
+        Возвращает (freq_hz, period_us). Нули — если амплитуда слишком мала
+        (signal flat) или фронтов меньше двух."""
+        n = int(samples.shape[0])
+        if n < 4 or sample_hz <= 0:
+            return 0.0, 0.0
+        s_min = float(samples.min())
+        s_max = float(samples.max())
+        # Шум-флор: <5% от 12-бит → считаем сигнал плоским.
+        if s_max - s_min < 200:
+            return 0.0, 0.0
+        mid = (s_min + s_max) * 0.5
+        above = samples >= mid
+        rising = np.where(np.diff(above.astype(np.int8)) > 0)[0]
+        if rising.size < 2:
+            return 0.0, 0.0
+        period_samples = (rising[-1] - rising[0]) / (rising.size - 1)
+        if period_samples <= 0:
+            return 0.0, 0.0
+        period_us = period_samples * 1_000_000.0 / sample_hz
+        freq_hz   = sample_hz / period_samples
+        return freq_hz, period_us
 
     def reset(self) -> None:
         self.clear()
@@ -288,14 +317,15 @@ class DumpChart(QWidget):
                 p.drawPath(path)
             p.restore()
 
-        # ---- большой readout (последний сэмпл) ----
+        # ---- большой readout: измеренная частота ----
+        has_freq = self._has_data and self._freq_hz > 0
         f_big = QFont("Consolas"); f_big.setPointSize(28); f_big.setBold(True)
         f_big.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 3)
         p.setFont(f_big)
-        p.setPen(QPen(QColor(COL_DIGITAL_DIM if not self._has_data else COL_DIGITAL)))
-        readout_w = 230
+        p.setPen(QPen(QColor(COL_DIGITAL if has_freq else COL_DIGITAL_DIM)))
+        readout_w = 260
         rect = QRectF(plot.right() - readout_w - 14, plot.top() + 10, readout_w, 50)
-        readout_text = self._value_fmt.format(self._peak) if self._has_data else "— — —"
+        readout_text = f"{self._freq_hz:,.0f} Hz" if has_freq else "— — —"
         p.drawText(
             rect,
             Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter,
@@ -307,8 +337,14 @@ class DumpChart(QWidget):
         p.setFont(f_unit)
         p.setPen(QPen(QColor(COL_LABEL)))
         rect2 = QRectF(plot.right() - readout_w - 14, plot.top() + 60, readout_w, 18)
+        if has_freq:
+            unit_text = (f"T = {self._period_us:.1f} µs"
+                         if self._period_us < 1000.0
+                         else f"T = {self._period_us / 1000.0:.2f} ms")
+        else:
+            unit_text = "STEP FREQ"
         p.drawText(
             rect2,
             Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter,
-            self._unit_label,
+            unit_text,
         )
