@@ -17,8 +17,8 @@ from PySide6.QtCore import QObject, Slot
 
 from ..models import (
     AsyncEvent, CommentEvent, DeviceModel, DumpLine, DumpSnapshot,
-    ErrEvent, LogSeverity, OkEvent, parse_line, ProbeDumpCollector,
-    ProbeSample, SerialWorker, UnknownLine,
+    ErrEvent, HallSample, LogSeverity, MotorSample, OkEvent, parse_line,
+    ProbeDumpCollector, ProbeSample, SerialWorker, TempSample, UnknownLine,
 )
 
 
@@ -110,19 +110,27 @@ class DeviceController(QObject):
         if isinstance(evt, DumpLine):
             self._probe.feed_line(evt)
             return
-        if isinstance(evt, ProbeSample):
-            self._model.append_log(
-                f"$P ts={evt.ts_ms} freq={evt.freq_hz} adc={evt.adc}",
-                LogSeverity.STREAM,
-            )
+
+        # Высокочастотные стримы — в model для UI (графики/ротор/readout),
+        # без логирования: на 50–100 Hz они захлестнули бы терминал.
+        if isinstance(evt, MotorSample):
+            self._model.push_motor_sample(evt)
             return
+        if isinstance(evt, TempSample):
+            self._model.push_temp_sample(evt)
+            return
+        if isinstance(evt, HallSample):
+            self._model.push_hall_sample(evt)
+            return
+        if isinstance(evt, ProbeSample):
+            self._model.push_probe_sample(evt)
+            return
+
         if isinstance(evt, UnknownLine):
             self._model.append_log(evt.raw, LogSeverity.RAW)
             return
 
-        # остальные стримы (TempSample, HallSample, MotorSample…) —
-        # пока компактным однострочником; при появлении отдельных панелей
-        # сюда повесим их через model-сигналы.
+        # неизвестный тип события — пишем в лог, чтобы не потерять
         self._model.append_log(f"[stream] {evt}", LogSeverity.STREAM)
 
     # ---- внутреннее ---------------------------------------------------

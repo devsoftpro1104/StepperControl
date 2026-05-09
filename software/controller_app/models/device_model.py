@@ -23,6 +23,14 @@ class DeviceModel(QObject):
     log_appended       = Signal(str, str)          # text, severity
     dump_completed     = Signal(object)            # DumpSnapshot
 
+    # Стримы датчиков. object — соответствующий dataclass из parser.py
+    # (MotorSample / TempSample / HallSample / ProbeSample). Так view-слой
+    # может подписаться напрямую и не зависит от формата сырой CLI-строки.
+    motor_sample_received = Signal(object)
+    temp_sample_received  = Signal(object)
+    hall_sample_received  = Signal(object)
+    probe_sample_received = Signal(object)
+
     def __init__(self, parent: Optional[QObject] = None) -> None:
         super().__init__(parent)
         self._connected: bool = False
@@ -46,8 +54,8 @@ class DeviceModel(QObject):
     # ---- mutations (для контроллера) ----
 
     def set_connection(self, connected: bool, port: str = "") -> None:
-        if (self._connected, self._port) == (connected, port):
-            return
+        # Без dedup: даже повторный (False,"") нужен — иначе при провале
+        # connect-а кнопка/LED во view не вернутся в состояние "не подключено".
         self._connected = connected
         self._port      = port
         self.connection_changed.emit(connected, port)
@@ -58,3 +66,17 @@ class DeviceModel(QObject):
     def set_dump(self, snap: DumpSnapshot) -> None:
         self._last_dump = snap
         self.dump_completed.emit(snap)
+
+    # ---- стримы датчиков (тонкие пуш-методы, без буферизации) ----------
+
+    def push_motor_sample(self, sample: object) -> None:
+        self.motor_sample_received.emit(sample)
+
+    def push_temp_sample(self, sample: object) -> None:
+        self.temp_sample_received.emit(sample)
+
+    def push_hall_sample(self, sample: object) -> None:
+        self.hall_sample_received.emit(sample)
+
+    def push_probe_sample(self, sample: object) -> None:
+        self.probe_sample_received.emit(sample)

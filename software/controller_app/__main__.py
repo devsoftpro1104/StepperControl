@@ -1,4 +1,4 @@
-"""Entry point — `python -m controller_app`.
+"""Entry point — `python -m controller_app` или `python software/run.py`.
 
 Здесь и только здесь связываются Model / View / Controller. Дальше
 расширение идёт точечно: добавили новый сигнал в model — подписали view;
@@ -19,26 +19,34 @@ from .views import MainWindow
 def main() -> int:
     app = QApplication(sys.argv)
     app.setApplicationName("StepperControl")
+    # Fusion — единый кросс-платформенный стиль; Windows-native рендерер
+    # на некоторых машинах подтягивает Fixedsys и роняется в DirectWrite.
+    app.setStyle("Fusion")
 
     model      = DeviceModel()
     view       = MainWindow()
     controller = DeviceController(model)
 
     # ---- model -> view ----
-    model.connection_changed.connect(lambda connected, _port: view.set_connected(connected))
-    model.log_appended.connect(view.log.append_line)
-    model.dump_completed.connect(lambda snap: view.plot.show_dump(snap.samples, snap.sample_hz))
+    model.connection_changed.connect(view.set_connected)
+    model.log_appended.connect(view.append_log)
+    model.dump_completed.connect(view.show_dump)
+    model.motor_sample_received.connect(view.on_motor_sample)
+    model.temp_sample_received.connect(view.on_temp_sample)
+    model.hall_sample_received.connect(view.on_hall_sample)
+    model.probe_sample_received.connect(view.on_probe_sample)
 
     # ---- view -> controller ----
     view.connect_requested.connect(controller.connect_to)
     view.disconnect_requested.connect(controller.disconnect)
-    view.dump_requested.connect(controller.request_probe_dump)
     view.command_submitted.connect(controller.send_command)
 
     # ---- shutdown ----
     app.aboutToQuit.connect(controller.shutdown)
 
     view.show()
+    view.raise_()
+    view.activateWindow()
     return app.exec()
 
 

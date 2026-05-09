@@ -18,7 +18,13 @@
       "Bash(./.venv/Scripts/python.exe -c \"from controller_app.controllers import DeviceController; from controller_app.models import DeviceModel, DumpSnapshot, LogSeverity; from controller_app.views import MainWindow; print\\('imports OK'\\)\")",
       "Bash(./.venv/Scripts/python.exe -c \"from controller_app.controllers import DeviceController; from controller_app.models import DeviceModel, DumpSnapshot, LogSeverity, ProbeDumpCollector, SerialWorker, parse_line, OkEvent; from controller_app.views import MainWindow; print\\('imports OK'\\)\")",
       "Bash(./.venv/Scripts/python.exe -c \"import controller_app.__main__ as m; print\\('entrypoint loads:', m.main\\)\")",
-      "Bash(./.venv/Scripts/python.exe -c \"import runpy; spec = runpy.run_path\\('run.py', run_name='__not_main__'\\); print\\('run.py imports OK, main=', spec.get\\('main'\\)\\)\")"
+      "Bash(./.venv/Scripts/python.exe -c \"import runpy; spec = runpy.run_path\\('run.py', run_name='__not_main__'\\); print\\('run.py imports OK, main=', spec.get\\('main'\\)\\)\")",
+      "Bash(./.venv/Scripts/python.exe -c ' *)",
+      "Bash(timeout 4 ./.venv/Scripts/python.exe -u -c ' *)",
+      "Bash(echo \"---exit:$?---\")",
+      "Bash(timeout 4 ./.venv/Scripts/python.exe -u run.py)",
+      "Bash(tasklist)",
+      "Bash(wait)"
     ]
   }
 }
