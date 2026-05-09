@@ -13,8 +13,10 @@ DeviceController), сэмплы и лог-строки от модели про�
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QFont
+from PySide6.QtGui import QFont, QPixmap
 from PySide6.QtWidgets import (
     QHBoxLayout, QLabel, QMainWindow, QStatusBar, QTabWidget, QVBoxLayout,
     QWidget,
@@ -63,6 +65,14 @@ class MainWindow(QMainWindow):
         led_box.addWidget(self.led_link)
         led_box.addWidget(link_lbl)
 
+        logo = QLabel()
+        logo_path = Path(__file__).resolve().parent.parent / "resource" / "izto_logo.png"
+        logo_pix = QPixmap(str(logo_path))
+        logo.setPixmap(
+            logo_pix.scaledToHeight(100, Qt.TransformationMode.SmoothTransformation)
+        )
+        logo.setStyleSheet("background: transparent;")
+
         title_box = QHBoxLayout()
         title_box.setSpacing(10)
         title_box.addWidget(title)
@@ -70,6 +80,8 @@ class MainWindow(QMainWindow):
 
         header = QHBoxLayout()
         header.setContentsMargins(10, 6, 10, 6)
+        header.addWidget(logo, 0, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        header.addSpacing(16)
         header.addLayout(title_box)
         header.addStretch(1)
         header.addLayout(led_box)
