@@ -93,7 +93,7 @@ verb'ов:
 
 | Команда                              | Ответ при успехе                          | Возможные `-ERR`                      |
 |--------------------------------------|-------------------------------------------|---------------------------------------|
-| `MOVE <steps> <speed_sps> <accel>`   | `+OK MOVE steps=<s> speed=<v> accel=<a>`  | `bad-number`, `bad-speed`, `bad-accel`, `fault` |
+| `MOVE <steps> <speed_sps>`           | `+OK MOVE steps=<s> speed=<v>`            | `bad-number`, `bad-speed`, `fault`, `busy`, `bad-steps`, `not-ready` |
 | `MOVETO <pos>`                       | (`-ERR MOVETO not-implemented`)           | `not-implemented` (TBD)               |
 | `STOP`                               | `+OK STOP`                                | —                                     |
 | `HOME`                               | (`-ERR HOME not-implemented`)             | `not-implemented` (TBD)               |
@@ -186,6 +186,9 @@ $H, <ts_ms>, <raw>, <centered>\r\n
 | `bad-accel`         | `accel` ≤ 0                                        |
 | `bad-rate`          | rate вне допустимого диапазона для подсистемы      |
 | `bad-arg`           | подкоманда не распознана (`TEMP <other>`)          |
+| `bad-steps`         | `steps == 0` в `MOVE`                              |
+| `busy`              | `MOVE` пришёл во время уже идущего движения        |
+| `not-ready`         | `MOVE` до старта `task_motor` (теоретически)        |
 | `fault`             | команда отвергнута, потому что `STATE = FAULT`     |
 | `line-too-long`     | строка превысила 127 символов                      |
 | `no-device`         | DS18B20 не отвечает presence-pulse'ом              |

@@ -4,6 +4,7 @@
 #include "uart.h"
 #include "ds18b20.h"
 #include "ah49e.h"
+#include "step_pwm.h"
 #include "stm32f4xx_ll_bus.h"
 #include "stm32f4xx_ll_gpio.h"
 
@@ -21,13 +22,13 @@ static void bsp_gpio_init(void) {
     gpio.Pin = PIN_LED_STATUS_PIN;
     LL_GPIO_Init(PIN_LED_STATUS_PORT, &gpio);
 
-    /* Шаговый драйвер: DIR, EN — обычные GPIO. STEP пока тоже GPIO; PWM заведём в драйвере timer. */
+    /* Шаговый драйвер: DIR, EN — обычные GPIO push-pull.
+       STEP инициализируется в step_pwm_init() как AF1 (TIM1_CH1) — здесь не трогаем,
+       чтобы не сбросить alt-function во время bring-up'а. */
     gpio.Pin = PIN_DIR_PIN;
     LL_GPIO_Init(PIN_DIR_PORT, &gpio);
     gpio.Pin = PIN_EN_PIN;
     LL_GPIO_Init(PIN_EN_PORT, &gpio);
-    gpio.Pin = PIN_STEP_PIN;
-    LL_GPIO_Init(PIN_STEP_PORT, &gpio);
 }
 
 void bsp_init(void) {
@@ -36,4 +37,5 @@ void bsp_init(void) {
     uart2_init();
     ds18b20_init();    /* DWT + GPIOB12 open-drain; реальное чтение — из task_temp */
     ah49e_init();      /* ADC1 + DMA2 Stream0 непрерывно крутят PA1; чтение — из task_hall */
+    step_pwm_init();   /* TIM1_CH1 PWM на PA8; до start() выходы в Hi-Z */
 }

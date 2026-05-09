@@ -7,9 +7,10 @@
 
 /* Шаговый драйвер целиком вынесен на GPIOA8..10:
    PA0/PA1 освобождены под аналоговый Hall-датчик AH49E (ADC1_IN1 на PA1).
-   STEP=PA8 — для будущего PWM это TIM1_CH1 (advanced timer). */
+   STEP=PA8 — TIM1_CH1, AF1 (advanced timer, PWM). */
 #define PIN_STEP_PORT          GPIOA
 #define PIN_STEP_PIN           LL_GPIO_PIN_8
+#define PIN_STEP_AF            LL_GPIO_AF_1     /* TIM1_CH1 */
 #define PIN_DIR_PORT           GPIOA
 #define PIN_DIR_PIN            LL_GPIO_PIN_9
 #define PIN_EN_PORT            GPIOA

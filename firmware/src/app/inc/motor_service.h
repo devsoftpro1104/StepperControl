@@ -34,15 +34,40 @@ bool        motor_service_set_period_ms(uint32_t ms);
 bool        motor_service_set_rate_hz(uint32_t hz);
 uint32_t    motor_service_rate_hz(void);
 
-/* Состояние двигателя (заполняется будущим профилировщиком). Сейчас все нули. */
+/* Состояние двигателя. Обновляется задачей task_motor, читается всеми. */
 int32_t     motor_service_position(void);        /* шагов от старта */
 int32_t     motor_service_target(void);          /* шагов до цели  */
-uint32_t    motor_service_speed_sps(void);       /* текущая скорость, шаг/с */
+uint32_t    motor_service_speed_sps(void);       /* текущая заданная скорость */
 
 bool        motor_service_en(void);
 void        motor_service_set_en(bool on);       /* физически дёргает PIN_EN */
 
 motor_dir_t motor_service_dir(void);
 void        motor_service_set_dir(motor_dir_t d); /* физически дёргает PIN_DIR */
+
+/* --- Оркестрация движения ---------------------------------------------- */
+/* Вызывается из task_motor один раз: запоминается TaskHandle для уведомлений
+   от ISR step_pwm. До этого motor_service_move() будет возвращать NOT_READY. */
+void        motor_service_register_owner(void *task_handle);
+
+typedef enum {
+    MOTOR_OK = 0,
+    MOTOR_ERR_BUSY,
+    MOTOR_ERR_BAD_STEPS,
+    MOTOR_ERR_BAD_SPEED,
+    MOTOR_ERR_NOT_READY,
+} motor_result_t;
+
+/* Запустить движение: знак steps задаёт направление, |steps| — число шагов,
+   speed_sps — постоянная скорость (профиль не реализован).
+   Завершение придёт в task_motor через xTaskNotify (см. task_motor.c). */
+motor_result_t motor_service_move(int32_t steps, uint32_t speed_sps);
+
+/* Немедленный обрыв текущего движения. Безопасно вызывать всегда. */
+void        motor_service_abort(void);
+
+/* Обновить s_position по фактически выпущенным шагам. Вызывается ТОЛЬКО
+   из task_motor (одиночный writer для s_position). */
+void        motor_service_sync_position_from_pwm(void);
 
 #endif /* APP_MOTOR_SERVICE_H */

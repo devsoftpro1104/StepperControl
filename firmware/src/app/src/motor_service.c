@@ -1,5 +1,6 @@
 #include "motor_service.h"
 #include "bsp_pins.h"
+#include "step_pwm.h"
 
 #include "FreeRTOS.h"
 #include "task.h"
@@ -22,6 +23,13 @@ static volatile uint32_t s_speed_sps  = 0;
 
 static volatile bool        s_en      = false;
 static volatile motor_dir_t s_dir     = MOTOR_DIR_CW;
+
+/* Оркестрация движения. Все эти поля пишутся ТОЛЬКО из контекста, который
+   уже эксклюзивно владеет motor_service (либо task_motor, либо команда CLI
+   при step_pwm не busy). volatile достаточно. */
+static          TaskHandle_t s_owner_task         = NULL;
+static volatile int8_t       s_move_dir_sign      = +1;     /* +1 / -1 */
+static volatile uint32_t     s_last_emitted_seen  = 0;
 
 void motor_service_init(void) {
     s_running   = false;
@@ -71,4 +79,46 @@ void motor_service_set_dir(motor_dir_t d) {
     s_dir = d;
     if (d == MOTOR_DIR_CW) LL_GPIO_ResetOutputPin(PIN_DIR_PORT, PIN_DIR_PIN);
     else                   LL_GPIO_SetOutputPin  (PIN_DIR_PORT, PIN_DIR_PIN);
+}
+
+void motor_service_register_owner(void *task_handle) {
+    s_owner_task = (TaskHandle_t)task_handle;
+}
+
+motor_result_t motor_service_move(int32_t steps, uint32_t speed_sps) {
+    if (s_owner_task == NULL)               return MOTOR_ERR_NOT_READY;
+    if (step_pwm_busy())                    return MOTOR_ERR_BUSY;
+    if (steps == 0)                         return MOTOR_ERR_BAD_STEPS;
+    if (!step_pwm_set_speed_sps(speed_sps)) return MOTOR_ERR_BAD_SPEED;
+
+    motor_dir_t  d = (steps > 0) ? MOTOR_DIR_CW : MOTOR_DIR_CCW;
+    motor_service_set_dir(d);
+    motor_service_set_en(true);
+
+    uint32_t abs_steps = (uint32_t)((steps > 0) ? steps : -steps);
+
+    s_speed_sps         = speed_sps;
+    s_target            = s_position + steps;
+    s_move_dir_sign     = (steps > 0) ? +1 : -1;
+    s_last_emitted_seen = 0;
+
+    if (!step_pwm_start(abs_steps, s_owner_task)) return MOTOR_ERR_BUSY;
+    return MOTOR_OK;
+}
+
+void motor_service_sync_position_from_pwm(void) {
+    /* Дельта от прошлой синхронизации, с учётом направления. Один writer
+       (task_motor) → лишних блокировок не нужно. */
+    uint32_t e = step_pwm_emitted();
+    uint32_t delta_unsigned = e - s_last_emitted_seen;
+    s_last_emitted_seen = e;
+    s_position += (int32_t)delta_unsigned * s_move_dir_sign;
+    s_speed_sps = step_pwm_busy() ? s_speed_sps : 0;
+}
+
+void motor_service_abort(void) {
+    step_pwm_stop();
+    motor_service_sync_position_from_pwm();   /* учесть всё, что успело выйти */
+    s_target    = s_position;                  /* мы там, где остановились */
+    s_speed_sps = 0;
 }

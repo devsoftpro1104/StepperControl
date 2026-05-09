@@ -114,11 +114,10 @@ static void cmd_state(int argc, char *argv[]) {
 }
 
 static void cmd_move(int argc, char *argv[]) {
-    if (argc != 4) { shell_println("-ERR MOVE usage MOVE <steps> <speed> <accel>"); return; }
-    long steps, speed, accel;
+    if (argc != 3) { shell_println("-ERR MOVE usage MOVE <steps> <speed>"); return; }
+    long steps, speed;
     if (!parse_long(argv[1], &steps) ||
-        !parse_long(argv[2], &speed) ||
-        !parse_long(argv[3], &accel)) {
+        !parse_long(argv[2], &speed)) {
         shell_println("-ERR MOVE bad-number");
         return;
     }
@@ -126,18 +125,29 @@ static void cmd_move(int argc, char *argv[]) {
         shell_println("-ERR MOVE bad-speed");
         return;
     }
-    if (accel <= 0) { shell_println("-ERR MOVE bad-accel"); return; }
     if (app_state_get() == APP_STATE_FAULT) { shell_println("-ERR MOVE fault"); return; }
 
-    /* TODO: реальный enqueue профиля движения в task_motor */
-    app_state_set(APP_STATE_MOVING);
-    shell_event("STATE MOVING");
-    shell_printf("+OK MOVE steps=%ld speed=%ld accel=%ld", steps, speed, accel);
+    /* Профиль скорости пока не реализован — движение идёт на постоянной
+       скорости. Когда заведём — ускорение будет глобальным через отдельную
+       команду MOTOR ACCEL <sps2>, а не возвращаться третьим аргументом MOVE. */
+    motor_result_t r = motor_service_move((int32_t)steps, (uint32_t)speed);
+    switch (r) {
+        case MOTOR_OK:
+            app_state_set(APP_STATE_MOVING);
+            shell_event("STATE MOVING");
+            shell_printf("+OK MOVE steps=%ld speed=%ld", steps, speed);
+            break;
+        case MOTOR_ERR_BUSY:       shell_println("-ERR MOVE busy");       break;
+        case MOTOR_ERR_BAD_STEPS:  shell_println("-ERR MOVE bad-steps");  break;
+        case MOTOR_ERR_BAD_SPEED:  shell_println("-ERR MOVE bad-speed");  break;
+        case MOTOR_ERR_NOT_READY:  shell_println("-ERR MOVE not-ready");  break;
+        default:                   shell_println("-ERR MOVE unknown");    break;
+    }
 }
 
 static void cmd_stop(int argc, char *argv[]) {
     (void)argc; (void)argv;
-    /* TODO: сигнал task_motor об аборте */
+    motor_service_abort();
     if (app_state_get() != APP_STATE_FAULT) {
         app_state_set(APP_STATE_IDLE);
         shell_event("STATE IDLE");
@@ -316,7 +326,7 @@ static void cmd_home(int argc, char *argv[]) {
 static void cmd_help(int argc, char *argv[]) {
     (void)argc; (void)argv;
     shell_println("+OK HELP cmds=PING,VER,STATE,MOVE,MOVETO,STOP,HOME,EN,DIR,MOTOR,TEMP,HALL,HELP,RESET");
-    shell_println("# MOVE   <steps:i32> <speed_sps:u32> <accel_sps2:u32>");
+    shell_println("# MOVE   <steps:i32> <speed_sps:u32>");
     shell_println("# MOVETO <pos:i32>                                    (TBD)");
     shell_println("# HOME                                                (TBD)");
     shell_println("# EN     ON|OFF                                       (GPIO PA10)");
