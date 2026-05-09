@@ -4,6 +4,7 @@
 #include "uart.h"
 #include "ds18b20.h"
 #include "ah49e.h"
+#include "adc_probe.h"
 #include "step_pwm.h"
 #include "stm32f4xx_ll_bus.h"
 #include "stm32f4xx_ll_gpio.h"
@@ -37,5 +38,6 @@ void bsp_init(void) {
     uart2_init();
     ds18b20_init();    /* DWT + GPIOB12 open-drain; реальное чтение — из task_temp */
     ah49e_init();      /* ADC1 + DMA2 Stream0 непрерывно крутят PA1; чтение — из task_hall */
+    adc_probe_init();  /* ADC2 + DMA2 Stream2 непрерывно сэмплят PA0 (STEP loopback) */
     step_pwm_init();   /* TIM1_CH1 PWM на PA8; до start() выходы в Hi-Z */
 }

@@ -100,6 +100,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     src/drivers/uart/inc
     src/drivers/onewire/inc
     src/drivers/adc/inc
+    src/drivers/adc_probe/inc
     src/drivers/step_pwm/inc
     src/devices/ds18b20/inc
     src/devices/ah49e/inc

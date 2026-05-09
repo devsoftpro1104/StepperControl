@@ -4,6 +4,7 @@
 #include "temp_service.h"
 #include "hall_service.h"
 #include "motor_service.h"
+#include "probe_service.h"
 
 #include "FreeRTOS.h"
 #include "task.h"
@@ -14,6 +15,7 @@ extern void task_motor     (void *argument);
 extern void task_diagnostic(void *argument);
 extern void task_temp      (void *argument);
 extern void task_hall      (void *argument);
+extern void task_probe     (void *argument);
 extern void task_watchdog  (void *argument);
 
 static const osThreadAttr_t s_attr_default = {
@@ -28,6 +30,7 @@ void app_init(void) {
     temp_service_init();
     hall_service_init();
     motor_service_init();
+    probe_service_init();
 }
 
 void app_run(void) {
@@ -35,8 +38,10 @@ void app_run(void) {
 
     osThreadAttr_t a;
 
-    /* protocol/telem делают snprintf — стек 512 для newlib-nano мал, поднимаем до 1024. */
-    a = s_attr_default; a.name = "protocol"; a.stack_size = 1024;
+    /* protocol гоняет shell + длинные команды (PROBE DUMP — вложенные snprintf
+       внутри 32-итерационного цикла). На newlib-nano запас на vsnprintf
+       ≈ 400 байт. 2048 даёт комфортный потолок под все будущие команды. */
+    a = s_attr_default; a.name = "protocol"; a.stack_size = 2048;
     osThreadNew(task_protocol,   NULL, &a);
 
     /* motor — будет рулить шаговиком (профиль движения TBD) и публиковать $M. */
@@ -54,6 +59,11 @@ void app_run(void) {
     /* hall — опрос AH49E через ADC: snprintf, не блокирующих вызовов нет. */
     a = s_attr_default; a.name = "hall"; a.stack_size = 1024;
     osThreadNew(task_hall,       NULL, &a);
+
+    /* probe — самодиагностика STEP через ADC2: pass по 4096-сэмплам ring-буфера
+       раз в 500 мс — ~5 мс CPU на проход, дальше snprintf + UART. */
+    a = s_attr_default; a.name = "probe"; a.stack_size = 1024;
+    osThreadNew(task_probe,      NULL, &a);
 
     a = s_attr_default; a.name = "wdg"; a.stack_size = 256;
     osThreadNew(task_watchdog,   NULL, &a);

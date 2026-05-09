@@ -8,6 +8,8 @@
 #include "hall_service.h"
 #include "ah49e.h"
 #include "motor_service.h"
+#include "probe_service.h"
+#include "adc_probe.h"
 
 #include "stm32f4xx.h"           /* NVIC_SystemReset */
 #include "FreeRTOS.h"
@@ -309,6 +311,88 @@ static void cmd_dir(int argc, char *argv[]) {
     }
 }
 
+/* PROBE DUMP: 4096 × 12-бит снимок ring'а в hex, по 128 семплов на строку.
+   На время дампа DMA приостановлен → $P-стрим (если был ON) пропускает
+   ~1.1 сек. После END возобновляется. Хост на PySide6 ловит маркеры:
+       +OK PROBE DUMP begin samples=N sample_hz=H
+       $D, <line_idx>, <hex 128*3>
+       ...
+       +OK PROBE DUMP end                                                */
+#define PROBE_DUMP_LINE_SAMPLES   128U
+#define PROBE_DUMP_LINES          (ADC_PROBE_BUF_LEN / PROBE_DUMP_LINE_SAMPLES)
+
+static void cmd_probe_dump(void) {
+    adc_probe_dump_begin();
+
+    shell_printf("+OK PROBE DUMP begin samples=%u sample_hz=%u",
+                 (unsigned)ADC_PROBE_BUF_LEN,
+                 (unsigned)ADC_PROBE_SAMPLE_HZ);
+
+    /* Линия: "$D, NN, " (≤10) + 128*3 hex (=384) + "\r\n" (=2) → ~400 байт.
+       ВАЖНО: static — стек task_protocol (1024) не вмещает локальный буфер
+       такого размера вместе с vsnprintf-кадром newlib-nano. shell — single
+       reader, реентерантности нет. */
+    static char line[420];
+    for (uint32_t l = 0; l < PROBE_DUMP_LINES; ++l) {
+        int p = snprintf(line, sizeof(line), "$D, %lu, ", (unsigned long)l);
+        if (p < 0) break;
+        for (uint32_t s = 0; s < PROBE_DUMP_LINE_SAMPLES; ++s) {
+            uint16_t v = adc_probe_dump_get(l * PROBE_DUMP_LINE_SAMPLES + s);
+            int n = snprintf(line + p, sizeof(line) - (size_t)p, "%03x", v & 0xFFFU);
+            if (n <= 0) { p = -1; break; }
+            p += n;
+        }
+        if (p < 0) break;
+        if (p < (int)sizeof(line) - 2) {
+            line[p++] = '\r';
+            line[p++] = '\n';
+        }
+        uart2_send((const uint8_t *)line, (uint16_t)p);
+    }
+
+    shell_println("+OK PROBE DUMP end");
+
+    adc_probe_dump_end();
+}
+
+static void cmd_probe(int argc, char *argv[]) {
+    if (argc < 2) { shell_println("-ERR PROBE usage PROBE ON|OFF|RATE <hz>|READ|DUMP"); return; }
+    to_upper_inplace(argv[1]);
+
+    if (strcmp(argv[1], "READ") == 0) {
+        adc_probe_stats_t s;
+        adc_probe_get_stats(&s);
+        probe_service_publish(&s);
+        shell_printf("+OK PROBE freq=%lu adc=%u",
+                     (unsigned long)s.freq_hz,
+                     (unsigned)s.adc);
+    } else if (strcmp(argv[1], "ON") == 0) {
+        probe_service_start();
+        shell_println("+OK PROBE ON");
+    } else if (strcmp(argv[1], "OFF") == 0) {
+        probe_service_stop();
+        shell_println("+OK PROBE OFF");
+    } else if (strcmp(argv[1], "RATE") == 0) {
+        if (argc != 3) { shell_println("-ERR PROBE usage PROBE RATE <hz>"); return; }
+        long hz;
+        if (!parse_long(argv[2], &hz) || hz <= 0) {
+            shell_println("-ERR PROBE bad-number");
+            return;
+        }
+        if (!probe_service_set_rate_hz((uint32_t)hz)) {
+            shell_printf("-ERR PROBE bad-rate min=%u max=%u",
+                         (unsigned)PROBE_RATE_MIN_HZ,
+                         (unsigned)PROBE_RATE_MAX_HZ);
+            return;
+        }
+        shell_printf("+OK PROBE RATE %ld", hz);
+    } else if (strcmp(argv[1], "DUMP") == 0) {
+        cmd_probe_dump();
+    } else {
+        shell_println("-ERR PROBE bad-arg");
+    }
+}
+
 static void cmd_moveto(int argc, char *argv[]) {
     (void)argc; (void)argv;
     /* TODO: абсолютное позиционирование. Требует профилировщика и
@@ -325,7 +409,7 @@ static void cmd_home(int argc, char *argv[]) {
 
 static void cmd_help(int argc, char *argv[]) {
     (void)argc; (void)argv;
-    shell_println("+OK HELP cmds=PING,VER,STATE,MOVE,MOVETO,STOP,HOME,EN,DIR,MOTOR,TEMP,HALL,HELP,RESET");
+    shell_println("+OK HELP cmds=PING,VER,STATE,MOVE,MOVETO,STOP,HOME,EN,DIR,MOTOR,TEMP,HALL,PROBE,HELP,RESET");
     shell_println("# MOVE   <steps:i32> <speed_sps:u32>");
     shell_println("# MOVETO <pos:i32>                                    (TBD)");
     shell_println("# HOME                                                (TBD)");
@@ -334,9 +418,11 @@ static void cmd_help(int argc, char *argv[]) {
     shell_println("# MOTOR  ON|OFF|RATE <hz:1..50>|READ                  -> $M");
     shell_println("# TEMP   ON|OFF|RATE <hz:1..1>|READ                   -> $T18 (DS18B20)");
     shell_println("# HALL   ON|OFF|RATE <hz:1..100>|READ|ZERO|ZEROCLR    -> $H   (AH49E)");
+    shell_println("# PROBE  ON|OFF|RATE <hz:1..50>|READ|DUMP             -> $P / $D");
     shell_println("# stream: $M,   <ts>, <pos>, <speed>, <target>, <en>, <dir>");
     shell_println("# stream: $T18, <ts>, <temp_c>");
     shell_println("# stream: $H,   <ts>, <raw>, <centered>");
+    shell_println("# stream: $P,   <ts>, <freq_hz>, <adc>");
     shell_println("# events: !STATE <name>  !FAULT <reason>  !DONE <what>");
 }
 
@@ -367,6 +453,7 @@ static const shell_cmd_t s_cmds[] = {
     { "MOTOR",  cmd_motor  },
     { "TEMP",   cmd_temp   },
     { "HALL",   cmd_hall   },
+    { "PROBE",  cmd_probe  },
     { "HELP",   cmd_help   },
     { "RESET",  cmd_reset  },
 };
