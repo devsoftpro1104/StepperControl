@@ -18,7 +18,7 @@ from typing import Optional
 
 from PySide6.QtCore import QPointF, QRectF, Qt, QTimer
 from PySide6.QtGui import (
-    QBrush, QColor, QConicalGradient, QFont, QLinearGradient, QPainter,
+    QBrush, QColor, QFont, QLinearGradient, QPainter,
     QPainterPath, QPen, QRadialGradient,
 )
 from PySide6.QtWidgets import QSizePolicy, QWidget
@@ -143,26 +143,6 @@ class RotorView(QWidget):
         p.setBrush(QBrush(disk_grad))
         p.setPen(QPen(QColor("#0a0d10"), 1.5))
         p.drawEllipse(QPointF(cx, cy), r_disk, r_disk)
-
-        # ------- conical-«след» при вращении -------
-        if self._running and self._dir_sign != 0:
-            cg = QConicalGradient(cx, cy, 90 - self._angle)
-            tail_col    = QColor(COL_DIGITAL); tail_col.setAlpha(110)
-            transparent = QColor(COL_DIGITAL); transparent.setAlpha(0)
-            if self._dir_sign > 0:
-                cg.setColorAt(0.00, tail_col)
-                cg.setColorAt(0.35, transparent)
-                cg.setColorAt(1.00, transparent)
-            else:
-                cg.setColorAt(0.00, tail_col)
-                cg.setColorAt(0.65, transparent)
-                cg.setColorAt(1.00, tail_col)
-            p.setBrush(QBrush(cg))
-            p.setPen(Qt.PenStyle.NoPen)
-            p.drawEllipse(QPointF(cx, cy), r_disk - 2, r_disk - 2)
-            # вырез в центре, чтобы след был кольцом
-            p.setBrush(QBrush(disk_grad))
-            p.drawEllipse(QPointF(cx, cy), r_disk * 0.55, r_disk * 0.55)
 
         # ------- индикаторная риска -------
         p.save()
