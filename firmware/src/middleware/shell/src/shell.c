@@ -158,8 +158,24 @@ static void cmd_stop(int argc, char *argv[]) {
 }
 
 static void cmd_temp(int argc, char *argv[]) {
-    if (argc < 2) { shell_println("-ERR TEMP usage TEMP ON|OFF|RATE <hz>|READ"); return; }
+    if (argc < 2) { shell_println("-ERR TEMP usage TEMP ON|OFF|RATE <hz>|READ|CONFIG"); return; }
     to_upper_inplace(argv[1]);
+
+    if (strcmp(argv[1], "CONFIG") == 0) {
+        /* Прошить EEPROM датчика в 12 бит. Запускается вручную, потому что:
+           — EEPROM имеет конечный ресурс (~50000 циклов), не хочется жечь на ребуте;
+           — сама функция всё равно проверит текущий CONFIG и пропустит запись, если
+             он уже совпадает, но повторные вызовы делать без причины смысла нет. */
+        ds18b20_status_t st = ds18b20_configure_resolution(DS18B20_RES_12BIT);
+        switch (st) {
+            case DS18B20_OK:        shell_println("+OK TEMP CONFIG 12bit");    break;
+            case DS18B20_NO_DEVICE: shell_println("-ERR TEMP no-device");      break;
+            case DS18B20_BAD_CRC:   shell_println("-ERR TEMP bad-crc");        break;
+            case DS18B20_BAD_VALUE: shell_println("-ERR TEMP verify-failed");  break;
+            default:                shell_println("-ERR TEMP unknown");        break;
+        }
+        return;
+    }
 
     if (strcmp(argv[1], "READ") == 0) {
         /* Синхронное чтение: блокирует shell на ≈770 мс. Допустимо — shell

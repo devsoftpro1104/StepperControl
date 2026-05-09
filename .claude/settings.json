@@ -24,7 +24,11 @@
       "Bash(echo \"---exit:$?---\")",
       "Bash(timeout 4 ./.venv/Scripts/python.exe -u run.py)",
       "Bash(tasklist)",
-      "Bash(wait)"
+      "Bash(wait)",
+      "PowerShell(cmake --build firmware/build/debug 2>&1)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\admin\\.claude\\projects\\c--STM32-StepperControl"
     ]
   }
 }

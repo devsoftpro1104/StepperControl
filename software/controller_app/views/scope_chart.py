@@ -64,6 +64,7 @@ class ScopeChart(QWidget):
         self._t0: Optional[float] = None
         self._current: float = (y_min + y_max) / 2.0
         self._idle_value: float = self._current
+        self._has_data: bool = False
 
         self.setMinimumSize(560, 220)
         self.setSizePolicy(
@@ -83,12 +84,14 @@ class ScopeChart(QWidget):
         if self._t0 is None:
             self._t0 = time.monotonic()
         self._current = float(v)
+        self._has_data = True
         self._samples.append((time.monotonic() - self._t0, float(v)))
 
     def reset(self) -> None:
         self._samples.clear()
         self._t0 = None
         self._current = self._idle_value
+        self._has_data = False
         self.update()
 
     # ---- тикер --------------------------------------------------------
@@ -278,31 +281,33 @@ class ScopeChart(QWidget):
                 p.drawPath(path)
             p.restore()
 
-        # ---- курсор справа ----
-        cur_y = v_to_y(max(y_min, min(y_max, self._current)))
+        # ---- курсор справа (только когда есть данные) ----
         p.setPen(QPen(QColor(COL_DIGITAL_DIM), 1, Qt.PenStyle.DashLine))
         p.drawLine(
             QPointF(plot.right(), plot.top()),
             QPointF(plot.right(), plot.bottom()),
         )
-        glow_dot = QColor(COL_DIGITAL); glow_dot.setAlpha(80)
-        p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(QBrush(glow_dot))
-        p.drawEllipse(QPointF(plot.right(), cur_y), 11, 11)
-        p.setBrush(QBrush(QColor(COL_DIGITAL)))
-        p.drawEllipse(QPointF(plot.right(), cur_y), 5, 5)
+        if self._has_data:
+            cur_y = v_to_y(max(y_min, min(y_max, self._current)))
+            glow_dot = QColor(COL_DIGITAL); glow_dot.setAlpha(80)
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(QBrush(glow_dot))
+            p.drawEllipse(QPointF(plot.right(), cur_y), 11, 11)
+            p.setBrush(QBrush(QColor(COL_DIGITAL)))
+            p.drawEllipse(QPointF(plot.right(), cur_y), 5, 5)
 
         # ---- большой readout текущего значения в правом верхнем углу ----
         f_big = QFont("Consolas"); f_big.setPointSize(28); f_big.setBold(True)
         f_big.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 3)
         p.setFont(f_big)
-        p.setPen(QPen(QColor(COL_DIGITAL)))
+        p.setPen(QPen(QColor(COL_DIGITAL_DIM if not self._has_data else COL_DIGITAL)))
         readout_w = 230
         rect = QRectF(plot.right() - readout_w - 14, plot.top() + 10, readout_w, 50)
+        readout_text = self._value_fmt.format(self._current) if self._has_data else "— — —"
         p.drawText(
             rect,
             Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter,
-            self._value_fmt.format(self._current),
+            readout_text,
         )
 
         f_unit = QFont(); f_unit.setPointSize(9); f_unit.setBold(True)

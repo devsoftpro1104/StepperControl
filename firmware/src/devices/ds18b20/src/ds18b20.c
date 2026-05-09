@@ -8,8 +8,11 @@
 #define CMD_SKIP_ROM         0xCCu
 #define CMD_CONVERT_T        0x44u
 #define CMD_READ_SCRATCHPAD  0xBEu
+#define CMD_WRITE_SCRATCHPAD 0x4Eu
+#define CMD_COPY_SCRATCHPAD  0x48u
 
 #define CONVERT_T_DELAY_MS   760U   /* 12-bit: tCONV_max = 750 мс */
+#define COPY_EEPROM_DELAY_MS 15U    /* tWR_max = 10 мс, +запас на power-on writes */
 
 static osMutexId_t s_bus_mutex;     /* шина 1-Wire — одна, делим между задачами */
 
@@ -74,6 +77,59 @@ ds18b20_status_t ds18b20_read_blocking(int16_t *out_c10) {
     if (c10 >  1250) c10 =  1250;     /* clamp по datasheet'у */
     if (c10 <  -550) c10 =  -550;
     *out_c10 = (int16_t)c10;
+
+out:
+    if (osKernelGetState() == osKernelRunning && s_bus_mutex != NULL) {
+        osMutexRelease(s_bus_mutex);
+    }
+    return st;
+}
+
+ds18b20_status_t ds18b20_configure_resolution(ds18b20_resolution_t res) {
+    if (osKernelGetState() == osKernelRunning && s_bus_mutex != NULL) {
+        osMutexAcquire(s_bus_mutex, osWaitForever);
+    }
+
+    ds18b20_status_t st = DS18B20_OK;
+    uint8_t scratch[9];
+
+    /* --- 1) Считываем scratchpad: проверяем CRC и узнаём текущий CONFIG --- */
+    if (!ow_reset()) { st = DS18B20_NO_DEVICE; goto out; }
+    ow_write_byte(CMD_SKIP_ROM);
+    ow_write_byte(CMD_READ_SCRATCHPAD);
+    ow_read_bytes(scratch, sizeof(scratch));
+
+    bool all_ff = true;
+    for (size_t i = 0; i < sizeof(scratch); ++i) {
+        if (scratch[i] != 0xFFu) { all_ff = false; break; }
+    }
+    if (all_ff)                                  { st = DS18B20_BAD_VALUE; goto out; }
+    if (crc8_dallas(scratch, 8) != scratch[8])   { st = DS18B20_BAD_CRC;   goto out; }
+
+    /* Если уже на нужном разрешении — EEPROM не дёргаем. Resource saving. */
+    if (scratch[4] == (uint8_t)res) goto out;
+
+    /* --- 2) Write Scratchpad: TH, TL, CONFIG (3 байта обязательно) --- */
+    if (!ow_reset()) { st = DS18B20_NO_DEVICE; goto out; }
+    ow_write_byte(CMD_SKIP_ROM);
+    ow_write_byte(CMD_WRITE_SCRATCHPAD);
+    ow_write_byte(0x7Fu);          /* TH = +127 °C — заведомо вне диапазона */
+    ow_write_byte(0x80u);          /* TL = −128 °C — alarm никогда не сработает */
+    ow_write_byte((uint8_t)res);   /* CONFIG = разрешение */
+
+    /* --- 3) Copy Scratchpad → EEPROM --- */
+    if (!ow_reset()) { st = DS18B20_NO_DEVICE; goto out; }
+    ow_write_byte(CMD_SKIP_ROM);
+    ow_write_byte(CMD_COPY_SCRATCHPAD);
+    osDelay(COPY_EEPROM_DELAY_MS);
+
+    /* --- 4) Verify: читаем scratchpad заново и сверяем CONFIG --- */
+    if (!ow_reset()) { st = DS18B20_NO_DEVICE; goto out; }
+    ow_write_byte(CMD_SKIP_ROM);
+    ow_write_byte(CMD_READ_SCRATCHPAD);
+    ow_read_bytes(scratch, sizeof(scratch));
+    if (crc8_dallas(scratch, 8) != scratch[8]) { st = DS18B20_BAD_CRC;   goto out; }
+    if (scratch[4] != (uint8_t)res)            { st = DS18B20_BAD_VALUE; goto out; }
 
 out:
     if (osKernelGetState() == osKernelRunning && s_bus_mutex != NULL) {
