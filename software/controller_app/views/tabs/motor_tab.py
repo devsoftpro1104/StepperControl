@@ -22,7 +22,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
     QHBoxLayout, QLabel, QPushButton, QSpinBox, QVBoxLayout, QWidget,
@@ -144,6 +144,9 @@ class MotorTab(QWidget):
         if delta == 0:
             return
         self.command_requested.emit(f"MOVE {delta} {speed}")
+        # Дамп STEP-сигнала через 100 мс — мотор уже стабильно крутится,
+        # ring-буфер ADC2 (~7.8 мс окно) захватит настоящие пульсации.
+        QTimer.singleShot(100, lambda: self.command_requested.emit("PROBE DUMP"))
 
     def _on_stop(self) -> None:
         self.command_requested.emit("STOP")
