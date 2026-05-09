@@ -44,7 +44,7 @@ def main() -> int:
     # ---- shutdown ----
     app.aboutToQuit.connect(controller.shutdown)
 
-    view.show()
+    view.showFullScreen()
     view.raise_()
     view.activateWindow()
     return app.exec()
