@@ -4,7 +4,15 @@
       "PowerShell(Remove-Item -Path \"c:\\\\STM32\\\\StepperControl\\\\tests\\\\integration\\\\test_uart_hello.py\" -Force -Confirm:$false)",
       "Bash(where.exe gh *)",
       "Bash(gh auth *)",
-      "Bash(cmake --build firmware/build/debug)"
+      "Bash(cmake --build firmware/build/debug)",
+      "Bash(py -3 --version)",
+      "Bash(where python *)",
+      "Bash(py -3 -m venv .venv)",
+      "Bash(.venv/Scripts/python.exe -m pip install --upgrade pip --disable-pip-version-check)",
+      "Bash(.venv/Scripts/python.exe -m pip install -r requirements.txt --disable-pip-version-check)",
+      "Bash(.venv/Scripts/python.exe -c ' *)",
+      "Bash(.venv/Scripts/python.exe -m pip install isort ruff --disable-pip-version-check)",
+      "Bash(software/.venv/Scripts/python.exe -m pip install isort ruff --disable-pip-version-check)"
     ]
   }
 }
