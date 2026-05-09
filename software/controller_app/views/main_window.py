@@ -2,8 +2,8 @@
 
 Вкладки:
   1. СОЕДИНЕНИЕ — порт + панель CLI-команд
-  2. МОТОР      — анимированный ротор + цифровой статус + waveform PROBE DUMP
-  3. ДАТЧИКИ    — rolling-графики TEMP / HALL / PROBE
+  2. МОТОР      — анимированный ротор + цифровой статус
+  3. ДАТЧИКИ    — rolling-график TEMP + waveform PROBE DUMP
   4. ТЕРМИНАЛ   — лог + raw command-line
 
 MainWindow — диспетчер. Сигналы пользователя поднимает наверх (для
@@ -142,19 +142,13 @@ class MainWindow(QMainWindow):
         self.terminal_tab.append_log(text, severity)
 
     def show_dump(self, snap) -> None:
-        self.motor_tab.show_dump(snap.samples, snap.sample_hz)
+        self.sensors_tab.show_dump(snap.samples, snap.sample_hz)
 
     def on_motor_sample(self, sample) -> None:
         self.motor_tab.on_motor_sample(sample)
 
     def on_temp_sample(self, sample) -> None:
         self.sensors_tab.on_temp_sample(sample)
-
-    def on_hall_sample(self, sample) -> None:
-        self.sensors_tab.on_hall_sample(sample)
-
-    def on_probe_sample(self, sample) -> None:
-        self.sensors_tab.on_probe_sample(sample)
 
     # ---- shortcuts ----------------------------------------------------
 

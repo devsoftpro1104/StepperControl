@@ -1,4 +1,4 @@
-"""Вкладка МОТОР: ротор + цифровые показометры + waveform PROBE DUMP.
+"""Вкладка МОТОР: ротор + цифровые показометры.
 
 Layout:
     ┌────────────────────────┬───────────────────────────┐
@@ -6,10 +6,7 @@ Layout:
     │    [ ANIMATED ROTOR ]  │  SPEED      0500 Hz       │
     │                        │  DIR        FRW           │
     │                        │  ENABLE     ON            │
-    ├────────────────────────┴───────────────────────────┤
-    │  ▼ PROBE DUMP WAVEFORM ─────────────────────────── │
-    │  pyqtgraph (one-shot, после команды PROBE DUMP)    │
-    └────────────────────────────────────────────────────┘
+    └────────────────────────┴───────────────────────────┘
 """
 
 from __future__ import annotations
@@ -22,7 +19,6 @@ from PySide6.QtWidgets import QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
 from ..digital_readout import DigitalReadout, DirReadout, FreqReadout
 from ..panel import Panel
-from ..plot_panel import PlotPanel
 from ..rotor_view import RotorView
 from ..theme import COL_DIGITAL, COL_LABEL
 
@@ -39,8 +35,6 @@ class MotorTab(QWidget):
         self.ena_lbl = QLabel("OFF")          # просто статус ENABLE
         self._style_ena(False)
 
-        self.plot = PlotPanel()
-
         # ---- левая панель: ротор ----
         rotor_panel = Panel("ROTOR")
         rotor_panel.add(self.rotor, 1)
@@ -52,21 +46,11 @@ class MotorTab(QWidget):
         readout_panel.add(self._labeled("DIRECTION",            self.dir))
         readout_panel.add(self._labeled("ENABLE",               self.ena_lbl))
 
-        # ---- waveform ----
-        plot_panel = Panel("PROBE DUMP WAVEFORM")
-        plot_panel.add(self.plot, 1)
-
-        # ---- общий layout: верх (ротор+статус), низ (плот) ----
-        top = QHBoxLayout()
-        top.setSpacing(12)
-        top.addWidget(rotor_panel,   3)
-        top.addWidget(readout_panel, 2)
-
-        layout = QVBoxLayout(self)
+        layout = QHBoxLayout(self)
         layout.setContentsMargins(12, 12, 12, 12)
-        layout.setSpacing(10)
-        layout.addLayout(top, 3)
-        layout.addWidget(plot_panel, 2)
+        layout.setSpacing(12)
+        layout.addWidget(rotor_panel,   3)
+        layout.addWidget(readout_panel, 2)
 
     # ---- слоты ---------------------------------------------------------
 
@@ -87,16 +71,12 @@ class MotorTab(QWidget):
 
         self._style_ena(bool(sample.en))
 
-    def show_dump(self, samples, sample_hz: int) -> None:
-        self.plot.show_dump(samples, sample_hz)
-
     def reset(self) -> None:
         self.rotor.reset()
         self.pos.set_value(0)
         self.freq.set_value(0)
         self.dir.set_dir("STOP")
         self._style_ena(False)
-        self.plot.clear()
 
     # ---- helpers -------------------------------------------------------
 
