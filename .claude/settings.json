@@ -3,7 +3,8 @@
     "allow": [
       "PowerShell(Remove-Item -Path \"c:\\\\STM32\\\\StepperControl\\\\tests\\\\integration\\\\test_uart_hello.py\" -Force -Confirm:$false)",
       "Bash(where.exe gh *)",
-      "Bash(gh auth *)"
+      "Bash(gh auth *)",
+      "Bash(cmake --build firmware/build/debug)"
     ]
   }
 }

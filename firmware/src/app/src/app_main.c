@@ -11,6 +11,7 @@ extern void task_protocol  (void *argument);
 extern void task_motor     (void *argument);
 extern void task_telemetry (void *argument);
 extern void task_diagnostic(void *argument);
+extern void task_temp      (void *argument);
 extern void task_watchdog  (void *argument);
 
 static const osThreadAttr_t s_attr_default = {
@@ -40,9 +41,13 @@ void app_run(void) {
     a = s_attr_default; a.name = "telem"; a.stack_size = 1024;
     osThreadNew(task_telemetry,  NULL, &a);
 
-    /* diag делает snprintf и блокирует на ~760 мс — даём 1024 байт стека. */
-    a = s_attr_default; a.name = "diag"; a.stack_size = 1024;
+    /* diag — только LED-маяк, ни snprintf, ни блокирующих чтений → 256 хватает. */
+    a = s_attr_default; a.name = "diag"; a.stack_size = 256;
     osThreadNew(task_diagnostic, NULL, &a);
+
+    /* temp — опрос DS18B20: snprintf + блок на ~760 мс на ds18b20_read_blocking. */
+    a = s_attr_default; a.name = "temp"; a.stack_size = 1024;
+    osThreadNew(task_temp,       NULL, &a);
 
     a = s_attr_default; a.name = "wdg"; a.stack_size = 256;
     osThreadNew(task_watchdog,   NULL, &a);
