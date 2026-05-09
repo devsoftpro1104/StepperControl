@@ -15,9 +15,6 @@
 void shell_init(void);
 void shell_feed(uint8_t b);                  /* подаёт 1 принятый байт */
 
-bool     shell_telem_enabled(void);          /* true если TELEM ON */
-uint16_t shell_telem_rate_hz(void);          /* текущая частота, Гц */
-
 /* Эмиссия асинхронного события: shell_event("STATE %s", "MOVING") → !STATE MOVING\r\n */
 void shell_event(const char *fmt, ...);
 

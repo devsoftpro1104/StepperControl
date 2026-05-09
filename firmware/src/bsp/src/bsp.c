@@ -3,12 +3,12 @@
 #include "bsp_pins.h"
 #include "uart.h"
 #include "ds18b20.h"
+#include "ah49e.h"
 #include "stm32f4xx_ll_bus.h"
 #include "stm32f4xx_ll_gpio.h"
 
 static void bsp_gpio_init(void) {
     LL_AHB1_GRP1_EnableClock(LL_AHB1_GRP1_PERIPH_GPIOA);
-    LL_AHB1_GRP1_EnableClock(LL_AHB1_GRP1_PERIPH_GPIOC);
     LL_AHB1_GRP1_EnableClock(LL_AHB1_GRP1_PERIPH_GPIOD);
 
     LL_GPIO_InitTypeDef gpio = {0};
@@ -34,5 +34,6 @@ void bsp_init(void) {
     bsp_clock_init_168mhz_hse();
     bsp_gpio_init();
     uart2_init();
-    ds18b20_init();    /* DWT + GPIOB12 open-drain; реальное чтение — из task_diagnostic */
+    ds18b20_init();    /* DWT + GPIOB12 open-drain; реальное чтение — из task_temp */
+    ah49e_init();      /* ADC1 + DMA2 Stream0 непрерывно крутят PA1; чтение — из task_hall */
 }

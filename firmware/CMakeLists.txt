@@ -99,7 +99,9 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     src/hal_port/inc
     src/drivers/uart/inc
     src/drivers/onewire/inc
+    src/drivers/adc/inc
     src/devices/ds18b20/inc
+    src/devices/ah49e/inc
     src/middleware/protocol/inc
     src/middleware/shell/inc
     src/config

@@ -2,6 +2,8 @@
 #include "app_state.h"
 #include "bsp.h"
 #include "temp_service.h"
+#include "hall_service.h"
+#include "motor_service.h"
 
 #include "FreeRTOS.h"
 #include "task.h"
@@ -9,9 +11,9 @@
 
 extern void task_protocol  (void *argument);
 extern void task_motor     (void *argument);
-extern void task_telemetry (void *argument);
 extern void task_diagnostic(void *argument);
 extern void task_temp      (void *argument);
+extern void task_hall      (void *argument);
 extern void task_watchdog  (void *argument);
 
 static const osThreadAttr_t s_attr_default = {
@@ -24,6 +26,8 @@ void app_init(void) {
     app_state_set(APP_STATE_BOOT);
     bsp_init();
     temp_service_init();
+    hall_service_init();
+    motor_service_init();
 }
 
 void app_run(void) {
@@ -35,11 +39,9 @@ void app_run(void) {
     a = s_attr_default; a.name = "protocol"; a.stack_size = 1024;
     osThreadNew(task_protocol,   NULL, &a);
 
-    a = s_attr_default; a.name = "motor"; a.priority = osPriorityAboveNormal;
+    /* motor — будет рулить шаговиком (профиль движения TBD) и публиковать $M. */
+    a = s_attr_default; a.name = "motor"; a.priority = osPriorityAboveNormal; a.stack_size = 1024;
     osThreadNew(task_motor,      NULL, &a);
-
-    a = s_attr_default; a.name = "telem"; a.stack_size = 1024;
-    osThreadNew(task_telemetry,  NULL, &a);
 
     /* diag — только LED-маяк, ни snprintf, ни блокирующих чтений → 256 хватает. */
     a = s_attr_default; a.name = "diag"; a.stack_size = 256;
@@ -48,6 +50,10 @@ void app_run(void) {
     /* temp — опрос DS18B20: snprintf + блок на ~760 мс на ds18b20_read_blocking. */
     a = s_attr_default; a.name = "temp"; a.stack_size = 1024;
     osThreadNew(task_temp,       NULL, &a);
+
+    /* hall — опрос AH49E через ADC: snprintf, не блокирующих вызовов нет. */
+    a = s_attr_default; a.name = "hall"; a.stack_size = 1024;
+    osThreadNew(task_hall,       NULL, &a);
 
     a = s_attr_default; a.name = "wdg"; a.stack_size = 256;
     osThreadNew(task_watchdog,   NULL, &a);

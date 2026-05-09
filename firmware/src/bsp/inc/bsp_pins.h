@@ -5,13 +5,20 @@
 
 /* Источник правды по выводам. См. docs/pinout.md */
 
+/* Шаговый драйвер целиком вынесен на GPIOA8..10:
+   PA0/PA1 освобождены под аналоговый Hall-датчик AH49E (ADC1_IN1 на PA1).
+   STEP=PA8 — для будущего PWM это TIM1_CH1 (advanced timer). */
 #define PIN_STEP_PORT          GPIOA
-#define PIN_STEP_PIN           LL_GPIO_PIN_0
+#define PIN_STEP_PIN           LL_GPIO_PIN_8
 #define PIN_DIR_PORT           GPIOA
-#define PIN_DIR_PIN            LL_GPIO_PIN_1
-/* PA2 отдан USART2_TX → EN перенесён на PC4 (свободен на Discovery). */
-#define PIN_EN_PORT            GPIOC
-#define PIN_EN_PIN             LL_GPIO_PIN_4
+#define PIN_DIR_PIN            LL_GPIO_PIN_9
+#define PIN_EN_PORT            GPIOA
+#define PIN_EN_PIN             LL_GPIO_PIN_10
+
+/* AH49E (линейный Hall): аналоговый выход → ADC1_IN1. */
+#define PIN_HALL_PORT          GPIOA
+#define PIN_HALL_PIN           LL_GPIO_PIN_1
+#define PIN_HALL_ADC_CHANNEL   1U
 
 #define PIN_LED_STATUS_PORT    GPIOD
 #define PIN_LED_STATUS_PIN     LL_GPIO_PIN_12

@@ -8,7 +8,6 @@ typedef enum {
     APP_EVT_PROTOCOL_FRAME,
     APP_EVT_MOTOR_DONE,
     APP_EVT_FAULT,
-    APP_EVT_TELEMETRY_TICK,
 } app_event_id_t;
 
 typedef struct {

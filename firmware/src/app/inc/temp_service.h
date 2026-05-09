@@ -14,6 +14,12 @@
 #define TEMP_PERIOD_MAX_MS  60000U
 #define TEMP_PERIOD_DEFAULT 1000U     /* «один раз в секунду» */
 
+/* Из-за tCONV ≈ 750 мс макс. практическая частота — 1 Гц (period 1000 мс).
+   Меньше 1 Гц через целочисленный rate не задаётся; если потребуется реже —
+   добавим отдельный verb типа TEMP SLOW <ms> или дробный rate. */
+#define TEMP_RATE_MIN_HZ    1U
+#define TEMP_RATE_MAX_HZ    1U
+
 void     temp_service_init(void);
 
 bool     temp_service_running(void);
@@ -22,6 +28,8 @@ void     temp_service_stop(void);
 
 uint32_t temp_service_period_ms(void);
 bool     temp_service_set_period_ms(uint32_t ms);   /* false → вне диапазона */
+bool     temp_service_set_rate_hz(uint32_t hz);     /* false → вне 1..1 Hz */
+uint32_t temp_service_rate_hz(void);                /* round(1000 / period_ms) */
 
 void     temp_service_publish(int16_t c10);
 void     temp_service_invalidate(void);

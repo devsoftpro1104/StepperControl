@@ -29,6 +29,16 @@ bool temp_service_set_period_ms(uint32_t ms) {
     return true;
 }
 
+bool temp_service_set_rate_hz(uint32_t hz) {
+    if (hz < TEMP_RATE_MIN_HZ || hz > TEMP_RATE_MAX_HZ) return false;
+    return temp_service_set_period_ms(1000U / hz);
+}
+
+uint32_t temp_service_rate_hz(void) {
+    /* округление вверх — чтобы 1500 мс не показывался как «0 Гц» */
+    return (1000U + s_period_ms / 2U) / s_period_ms;
+}
+
 void temp_service_publish(int16_t c10) {
     s_last_c10   = c10;
     s_last_ts_ms = (uint32_t)xTaskGetTickCount();
