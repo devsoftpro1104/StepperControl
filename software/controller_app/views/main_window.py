@@ -95,10 +95,10 @@ class MainWindow(QMainWindow):
         self.tabs = QTabWidget()
         self.tabs.setStyleSheet(tab_qss())
         self.tabs.setDocumentMode(True)
-        self.tabs.addTab(self.connect_tab,  "СОЕДИНЕНИЕ")
-        self.tabs.addTab(self.motor_tab,    "МОТОР")
-        self.tabs.addTab(self.sensors_tab,  "ДАТЧИКИ")
-        self.tabs.addTab(self.terminal_tab, "ТЕРМИНАЛ")
+        self.tabs.addTab(self.connect_tab,  "CONNECTION")
+        self.tabs.addTab(self.motor_tab,    "MOTOR")
+        self.tabs.addTab(self.sensors_tab,  "SENSORS")
+        self.tabs.addTab(self.terminal_tab, "TERMINAL")
 
         # ---- общий layout ----
         root = QVBoxLayout()
