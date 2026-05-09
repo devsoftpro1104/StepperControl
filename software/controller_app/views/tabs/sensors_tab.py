@@ -1,9 +1,10 @@
-"""Вкладка ДАТЧИКИ: TEMP rolling + waveform PROBE DUMP.
+"""Вкладка ДАТЧИКИ: три графика стопкой, без заголовков.
 
   - TEMP   — DS18B20, °C    (диапазон −10…+60)
+  - HALL   — AH49E, centered ADC counts (диапазон ±2048)
   - PROBE  — waveform-снимок после команды PROBE DUMP
 
-Подписаны на model.temp_sample_received и model.dump_completed.
+Подписаны на model.{temp,hall}_sample_received и model.dump_completed.
 """
 
 from __future__ import annotations
@@ -13,7 +14,6 @@ from typing import Optional
 from PySide6.QtWidgets import QVBoxLayout, QWidget
 
 from ..dump_chart import DumpChart
-from ..panel import Panel
 from ..scope_chart import ScopeChart
 
 
@@ -29,6 +29,13 @@ class SensorsTab(QWidget):
             value_fmt="{:+7.2f}", tick_fmt="{:+.0f}",
             zero_line=True,
         )
+        self.hall = ScopeChart(
+            y_min=-2048, y_max=2047,
+            y_step_major=500, y_step_minor=100,
+            axis_label="ADC", unit_label="ctr",
+            value_fmt="{:+7.0f}", tick_fmt="{:+.0f}",
+            zero_line=True,
+        )
         self.probe = DumpChart(
             y_min=0, y_max=3.3,
             y_step_major=0.5, y_step_minor=0.1,
@@ -37,26 +44,25 @@ class SensorsTab(QWidget):
             zero_line=False,
         )
 
-        temp_panel  = Panel("TEMPERATURE  ·  DS18B20  ·  $T18")
-        temp_panel.add(self.temp, 1)
-
-        probe_panel = Panel("PROBE DUMP WAVEFORM")
-        probe_panel.add(self.probe, 1)
-
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(12, 12, 12, 12)
-        layout.setSpacing(10)
-        layout.addWidget(temp_panel,  1)
-        layout.addWidget(probe_panel, 1)
+        layout.setContentsMargins(6, 6, 6, 6)
+        layout.setSpacing(4)
+        layout.addWidget(self.temp,  1)
+        layout.addWidget(self.hall,  1)
+        layout.addWidget(self.probe, 1)
 
     # ---- слоты модели --------------------------------------------------
 
     def on_temp_sample(self, s) -> None:
         self.temp.push_value(s.temp_c)
 
+    def on_hall_sample(self, s) -> None:
+        self.hall.push_value(s.centered)
+
     def show_dump(self, samples, sample_hz: int) -> None:
         self.probe.show_dump(samples, sample_hz)
 
     def reset(self) -> None:
         self.temp.reset()
+        self.hall.reset()
         self.probe.reset()

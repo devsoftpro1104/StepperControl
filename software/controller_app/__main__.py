@@ -33,6 +33,7 @@ def main() -> int:
     model.dump_completed.connect(view.show_dump)
     model.motor_sample_received.connect(view.on_motor_sample)
     model.temp_sample_received.connect(view.on_temp_sample)
+    model.hall_sample_received.connect(view.on_hall_sample)
 
     # ---- view -> controller ----
     view.connect_requested.connect(controller.connect_to)

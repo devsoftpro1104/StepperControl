@@ -59,7 +59,7 @@ class DumpChart(QWidget):
         self._peak: float = (y_min + y_max) / 2.0
         self._has_data: bool = False
 
-        self.setMinimumSize(560, 220)
+        self.setMinimumSize(560, 140)
         self.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding,
         )

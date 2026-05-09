@@ -1,13 +1,19 @@
 """Анимированный круглый ротор: «торец двигателя» с риской.
 
-Принимает (freq_hz, dir_sign) — крутится непрерывно с угловой скоростью
-freq * 360°/STEPS_PER_REV. Все детали (алюминиевый корпус, винтики, шкала
-градусов, светящаяся риска, conical-tail след) рисуются в paintEvent.
+Угол риски жёстко привязан к фактической позиции мотора в шагах:
+один полный оборот = STEPS_PER_REV шагов. 6400 → ровно 2 оборота, 6500
+→ 2 оборота + 100 шагов = 11.25°. На остановке риска остаётся в углу,
+соответствующем последней позиции (а не возвращается на 0°).
+
+Между приходящими $M-сэмплами (10 Hz) экстраполируем позицию по freq,
+чтобы анимация была плавной — но как только пришёл новый сэмпл, угол
+ре-якорится по нему.
 """
 
 from __future__ import annotations
 
 import math
+import time
 from typing import Optional
 
 from PySide6.QtCore import QPointF, QRectF, Qt, QTimer
@@ -20,7 +26,7 @@ from PySide6.QtWidgets import QSizePolicy, QWidget
 from .theme import COL_DIGITAL, COL_DIGITAL_DIM, COL_TEXT_DIM
 
 
-STEPS_PER_REV = 200      # NEMA-23 без микрошага; для визуала достаточно
+STEPS_PER_REV = 3200     # NEMA-23 c микрошагом 1/16 (200 × 16 = 3200)
 
 
 class RotorView(QWidget):
@@ -29,49 +35,52 @@ class RotorView(QWidget):
         self.setMinimumSize(280, 280)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
-        self._angle:    float = 0.0
-        self._freq_hz:  float = 0.0
-        self._dir_sign: int   = 0
-        self._running:  bool  = False
+        self._anchor_pos:  float = 0.0     # позиция, на момент anchor_time
+        self._anchor_time: float = time.monotonic()
+        self._freq_hz:     float = 0.0
+        self._dir_sign:    int   = 0
+        self._running:     bool  = False
 
-        # 60 fps ровный таймер.
+        # 60 fps ровный таймер для перерисовки при экстраполяции.
         self._timer = QTimer(self)
         self._timer.setInterval(16)
-        self._timer.timeout.connect(self._tick)
+        self._timer.timeout.connect(self.update)
         self._timer.start()
 
     # ---- публичный API ------------------------------------------------
 
     def reset(self) -> None:
-        self._angle    = 0.0
-        self._freq_hz  = 0.0
-        self._dir_sign = 0
-        self._running  = False
+        self._anchor_pos  = 0.0
+        self._anchor_time = time.monotonic()
+        self._freq_hz     = 0.0
+        self._dir_sign    = 0
+        self._running     = False
         self.update()
 
-    def set_freq_dir(self, freq_hz: float, dir_sign: int) -> None:
-        """freq_hz — модуль; dir_sign — −1 / 0 / +1.
+    def set_state(self, pos: int, speed_sps: int) -> None:
+        """Жёстко привязать ротор к актуальной позиции в шагах.
 
-        При остановке (freq=0 или dir=0) угол сбрасывается на 0° — риска
-        всегда возвращается «вверх», независимо от того, где остановился
-        физический ротор. Это базовое состояние «по умолчанию»."""
-        self._freq_hz  = float(abs(freq_hz))
-        self._dir_sign = 1 if dir_sign > 0 else (-1 if dir_sign < 0 else 0)
-        self._running  = (self._freq_hz > 0 and self._dir_sign != 0)
-        if not self._running:
-            self._angle = 0.0
-            self.update()
-
-    # ---- интерполяция -------------------------------------------------
-
-    def _tick(self) -> None:
-        if not self._running:
-            return
-        # Угловая скорость = freq * 360°/STEPS_PER_REV; dt — период таймера.
-        dt  = self._timer.interval() / 1000.0
-        deg = self._freq_hz * self._dir_sign * 360.0 / STEPS_PER_REV * dt
-        self._angle = (self._angle + deg) % 360.0
+        speed_sps — со знаком: знак = направление, модуль = частота шагов.
+        Между сэмплами угол экстраполируется от anchor_pos по freq. На
+        остановке (speed=0) ротор замирает в текущем углу."""
+        self._anchor_pos  = float(pos)
+        self._anchor_time = time.monotonic()
+        self._freq_hz     = float(abs(speed_sps))
+        self._dir_sign    = 1 if speed_sps > 0 else (-1 if speed_sps < 0 else 0)
+        self._running     = (self._freq_hz > 0 and self._dir_sign != 0)
         self.update()
+
+    # ---- helpers ------------------------------------------------------
+
+    def _current_pos(self) -> float:
+        if not self._running:
+            return self._anchor_pos
+        dt = time.monotonic() - self._anchor_time
+        return self._anchor_pos + self._dir_sign * self._freq_hz * dt
+
+    @property
+    def _angle(self) -> float:
+        return (self._current_pos() / STEPS_PER_REV * 360.0) % 360.0
 
     # ---- рисование ----------------------------------------------------
 

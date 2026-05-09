@@ -66,7 +66,7 @@ class ScopeChart(QWidget):
         self._idle_value: float = self._current
         self._has_data: bool = False
 
-        self.setMinimumSize(560, 220)
+        self.setMinimumSize(560, 140)
         self.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding,
         )
