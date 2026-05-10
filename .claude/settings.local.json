@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C c:/STM32/StepperControl ls-files firmware/tests software/tests tests)",
+      "Bash(git -C c:/STM32/StepperControl status)"
+    ]
+  }
+}
