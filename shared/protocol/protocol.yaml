@@ -1,4 +1,4 @@
-# Единый источник правды по протоколу обмена.
+# Единый первоисточник по протоколу обмена.
 # Из этого файла генерируются:
 #   - firmware/src/middleware/protocol/inc/protocol_gen.h
 #   - software/src/controller_app/protocol/messages.py

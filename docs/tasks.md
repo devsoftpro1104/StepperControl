@@ -3,7 +3,7 @@
 Документ описывает FreeRTOS-задачи приложения: где они создаются, их приоритеты,
 размеры стеков, периоды, способ взаимодействия с сервисами и shell.
 
-Источник правды по коду:
+Первоисточник по коду:
 - создание задач — [`firmware/src/app/src/app_main.c`](../firmware/src/app/src/app_main.c)
 - сами задачи — [`firmware/src/app/src/tasks/`](../firmware/src/app/src/tasks/)
 - параметры RTOS — [`firmware/src/config/FreeRTOSConfig.h`](../firmware/src/config/FreeRTOSConfig.h)

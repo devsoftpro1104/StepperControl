@@ -1,6 +1,6 @@
 # Тактирование и шины STM32F407
 
-Источник правды: [firmware/src/bsp/src/bsp_clock.c](../firmware/src/bsp/src/bsp_clock.c), функция `bsp_clock_init_168mhz_hse()`. Документ описывает состояние **после** её выполнения.
+Первоисточник: [firmware/src/bsp/src/bsp_clock.c](../firmware/src/bsp/src/bsp_clock.c), функция `bsp_clock_init_168mhz_hse()`. Документ описывает состояние **после** её выполнения.
 
 ## Дерево тактирования
 

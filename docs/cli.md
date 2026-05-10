@@ -4,7 +4,7 @@
 телеметрии. Используется для отладки в терминале и как транспорт команд для
 GUI на PyQt/PySide6.
 
-Источник правды по грамматике — заголовок [firmware/src/middleware/shell/inc/shell.h](../firmware/src/middleware/shell/inc/shell.h).
+Первоисточник по грамматике — заголовок [firmware/src/middleware/shell/inc/shell.h](../firmware/src/middleware/shell/inc/shell.h).
 Реализация диспетчера — [shell.c](../firmware/src/middleware/shell/src/shell.c).
 
 > CLI **не заменяет** бинарный TLV-протокол из [protocol.md](protocol.md). Текстовый

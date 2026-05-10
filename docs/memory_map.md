@@ -1,6 +1,6 @@
 # Карта памяти STM32F407
 
-Источник правды — [firmware/linker/stm32f407xx_flash.ld](../firmware/linker/stm32f407xx_flash.ld).
+Первоисточник — [firmware/linker/stm32f407xx_flash.ld](../firmware/linker/stm32f407xx_flash.ld).
 
 ## Текущая раскладка
 

@@ -12,7 +12,7 @@
 | DIR      | **PA9** | GPIO out, push-pull                                    | 0 = FRW (по часовой), 1 = BCK (против) |
 | EN       | **PA10**| GPIO out, push-pull                                    | **active-LOW**: pin LOW = драйвер включён |
 
-Источник правды — [`bsp_pins.h`](../firmware/src/bsp/inc/bsp_pins.h).
+Первоисточник — [`bsp_pins.h`](../firmware/src/bsp/inc/bsp_pins.h).
 
 > **Внимание (Discovery):** PA9/PA10 на плате STM32F4 Discovery физически
 > разведены на USB OTG FS (PA9 = VBUS sense, PA10 = ID). На кастомной плате

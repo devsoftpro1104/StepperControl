@@ -1,6 +1,6 @@
 # Independent Watchdog (IWDG)
 
-Источник правды: [firmware/src/app/src/tasks/task_watchdog.c](../firmware/src/app/src/tasks/task_watchdog.c). Документ описывает поведение **после** старта планировщика FreeRTOS.
+Первоисточник: [firmware/src/app/src/tasks/task_watchdog.c](../firmware/src/app/src/tasks/task_watchdog.c). Документ описывает поведение **после** старта планировщика FreeRTOS.
 
 ## Зачем нужен
 

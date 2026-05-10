@@ -1,7 +1,7 @@
 # Протокол обмена
 
 Бинарный TLV-протокол поверх UART/USB-CDC/TCP.
-Источник правды: [shared/protocol/protocol.yaml](../shared/protocol/protocol.yaml).
+Первоисточник: [shared/protocol/protocol.yaml](../shared/protocol/protocol.yaml).
 Заголовки/коды/CRC генерируются скриптами `generate_c.py` и `generate_py.py`.
 
 См. также:

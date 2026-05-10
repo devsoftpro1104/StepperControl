@@ -1,6 +1,6 @@
 # Карта выводов STM32F407
 
-Источник правды — [firmware/src/bsp/inc/bsp_pins.h](../firmware/src/bsp/inc/bsp_pins.h).
+Первоисточник — [firmware/src/bsp/inc/bsp_pins.h](../firmware/src/bsp/inc/bsp_pins.h).
 Этот документ только синхронизирует «функция → пин» в одном месте.
 
 ## Используемые пины
