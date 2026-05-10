@@ -68,9 +68,7 @@ class MainWindow(QMainWindow):
         logo = QLabel()
         logo_path = Path(__file__).resolve().parent.parent / "resource" / "izto_logo.png"
         logo_pix = QPixmap(str(logo_path))
-        logo.setPixmap(
-            logo_pix.scaledToHeight(100, Qt.TransformationMode.SmoothTransformation)
-        )
+        logo.setPixmap(logo_pix)
         logo.setStyleSheet("background: transparent;")
 
         title_box = QHBoxLayout()
@@ -80,8 +78,9 @@ class MainWindow(QMainWindow):
 
         header = QHBoxLayout()
         header.setContentsMargins(10, 6, 10, 6)
-        header.addWidget(logo, 0, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
-        header.addSpacing(16)
+        header.addStretch(1)
+        header.addWidget(logo, 0, Qt.AlignmentFlag.AlignVCenter)
+        header.addSpacing(12)
         header.addLayout(title_box)
         header.addStretch(1)
         header.addLayout(led_box)
