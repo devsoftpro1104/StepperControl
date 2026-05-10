@@ -122,7 +122,7 @@ ADC может работать только с DMA2 (RM0090 §10.3.1). Stream 4
       ▲
       │ hall_service_get_last()
       │
-   shell.c (HALL READ)        task_telemetry (резерв)
+   shell.c (HALL READ)
 ```
 
 ## FreeRTOS-задача `task_hall` (детально)
@@ -144,9 +144,9 @@ osThreadNew(task_hall, NULL, &a);
 
 | Параметр       | Значение            | Почему именно так |
 |----------------|---------------------|-------------------|
-| Имя            | `"hall"`            | Видно в `vTaskList()` рядом с `temp`, `diag` |
+| Имя            | `"hall"`            | Видно в `vTaskList()` рядом с `temp`, `probe`, `diag` |
 | Стек           | **1024 байт**       | snprintf newlib-nano + buf[48] = пик ~600 байт; запас на ISR |
-| Приоритет      | `osPriorityNormal`  | Совпадает с `temp`/`telem`/`protocol`/`diag` |
+| Приоритет      | `osPriorityNormal`  | Совпадает с `temp`/`probe`/`protocol`/`diag` (выше — только `motor`) |
 | Аргумент       | `NULL`              | Состояние шарится через `hall_service` |
 | Тип            | Динамический        | Все потоки в проекте через `osThreadNew` |
 
@@ -199,7 +199,7 @@ osThreadNew(task_hall, NULL, &a);
 ### Почему `IDLE_POLL_MS = 200`
 
 То же обоснование, что и в `task_temp`: компромисс между лагом на
-`HALL START` и сложностью. Если потребуется реакция за миллисекунды —
+`HALL ON` и сложностью. Если потребуется реакция за миллисекунды —
 заменить на `osEventFlagsWait(... osWaitForever)` + флаг из
 `hall_service_start()`/`hall_service_set_period_ms()`.
 
@@ -210,7 +210,6 @@ osThreadNew(task_hall, NULL, &a);
                                               │  обращение
    task_hall ──► ah49e_read_*()  ─────────────┤  к одному
                                               │  ring-buffer'у
-   task_telemetry (резерв) ──► hall_service_get_last()
                                               ▼
                                   ┌─────────────────────┐
                                   │ s_adc_buf[16]       │ ← DMA пишет сюда
@@ -221,10 +220,8 @@ osThreadNew(task_hall, NULL, &a);
 - **Гонок за шину нет**: ADC + DMA — single-writer, читать ring можно из
   любой задачи без мьютекса; volatile + atomic-доступ к 16-bit на M4
   достаточны.
-- **Соседи через `hall_service`**: `task_telemetry` может в перспективе
-  подмешивать поле в свой `$T` — пока этого не делает (там только
-  температура). Если понадобится — добавить колонку `<hall>` в формат
-  и `hall_service_get_last(...)` в task_telemetry.
+- **Доступ из shell**: `cmd_hall(READ)` идёт мимо `task_hall` напрямую в
+  `ah49e_read_*` — это безопасно по той же причине (ring single-writer).
 
 ### Анализ стека
 
@@ -275,7 +272,7 @@ osThreadNew(task_hall, NULL, &a);
 
 | Стрим                                         | Источник         | Когда отправляется |
 |-----------------------------------------------|------------------|--------------------|
-| `$H, <ts_ms>, <raw>, <centered>\r\n`          | `task_hall`      | Каждый период, если `HALL START` |
+| `$H, <ts_ms>, <raw>, <centered>\r\n`          | `task_hall`      | Каждый период, если `HALL ON` |
 
 Поля:
 - `<raw>` — 0..4095, усреднённое 16-сэмплами
@@ -298,7 +295,8 @@ datasheet ±150 мВ. Кроме того, на pcb-level есть собств�
    величину отклонения** от калиброванного нуля.
 
 Калибровка хранится **только в RAM** — после reset придётся повторить.
-В перспективе — сохранять в EEPROM (когда подключим I2C1 на PB6/7).
+В перспективе — сохранять в энергонезависимой памяти (Flash или внешний
+EEPROM, если будет добавлен).
 
 ## Перевод counts → физика
 

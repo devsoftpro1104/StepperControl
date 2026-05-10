@@ -7,16 +7,52 @@
 ## 1. Контекст и цели
 
 Проект разрабатывает связку «контроллер шагового двигателя на STM32F407 + хост-GUI
-на Python/PyQt6». Цели архитектуры:
+на Python / PySide6». Цели архитектуры:
 
 - **Чёткое разделение слоёв.** Прикладной код прошивки не должен зависеть от
   конкретного семейства STM32, а UI хоста — от конкретного транспорта.
-- **Единый источник правды по протоколу.** Прошивка и хост используют один
-  и тот же YAML-описатель команд; рассинхронизация невозможна по построению.
-- **Тестируемость без железа.** И прошивка, и хост имеют слой моков,
-  позволяющий гонять unit- и часть integration-тестов на CI.
-- **Воспроизводимая сборка.** Тулчейн ARM, CMake-пресеты, фиксированные
-  версии Python-зависимостей.
+- **Единый источник правды по протоколу.** Прошивка и хост используют одну
+  и ту же грамматику команд; рассинхронизация невозможна по построению.
+  Сейчас канал — текстовый CLI ([cli.md](cli.md)); бинарный TLV из
+  `shared/protocol/protocol.yaml` запланирован, но пока не задействован.
+- **Тестируемость без железа.** Долгосрочная цель — слой моков для unit/
+  integration-тестов на CI. На сегодня — заготовлена структура каталогов,
+  тестов и моков ещё нет.
+- **Воспроизводимая сборка.** Тулчейн ARM (CMake + arm-none-eabi-gcc),
+  фиксированные версии third_party (FreeRTOS-Kernel, STM32CubeF4 V1.28.3),
+  фиксированные версии Python-зависимостей в `software/requirements.txt`.
+
+### Текущее состояние одной диаграммой
+
+```
+       UART2 (USART2 PA2/PA3, 115200 8N1)
+           ▲                ▲
+           │ shell-CLI      │ телеметрия $M, $T18, $H, $P, $D
+           │
+   ┌────────────────────┐                ┌─────────────────────────┐
+   │  STM32F407         │                │  Хост (PySide6)         │
+   │                    │                │                         │
+   │  task_protocol     │                │  SerialWorker (QThread) │
+   │      │             │                │      ↓                  │
+   │  shell.c (cmd_*)   │                │  parser.py              │
+   │      │             │                │      ↓                  │
+   │  motor/temp/hall/  │                │  DeviceModel (state)    │
+   │  probe_service     │                │      ↓                  │
+   │      │             │                │  views (panels, charts) │
+   │  drivers + devices │                │                         │
+   │  + ISR + FreeRTOS  │                │                         │
+   └────────────────────┘                └─────────────────────────┘
+```
+
+Минимум, что должен помнить читатель перед PR:
+
+- Транспорт — **только текстовый CLI** через USART2, см. [cli.md](cli.md).
+- Бинарный TLV (`shared/protocol/protocol.yaml`, `middleware/protocol/`) —
+  запланирован, **в сборку не подключён**, диспетчера кадров ещё нет.
+- Семь FreeRTOS-задач, четыре стрима `$X` (motor/temp/hall/probe) +
+  событийные `!STATE/!DONE/!FAULT` — раскладка в [tasks.md](tasks.md).
+- USB CDC, I²C, CAN, внешний EEPROM/ADS1115/TJA1051 — **не реализованы**;
+  соответствующие пины свободны (см. [pinout.md](pinout.md)).
 
 ## 2. Карта верхнего уровня
 
@@ -111,7 +147,7 @@ ARM GCC, флаги MCU (`-mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard`).
 | `CMSIS/`                       | CMSIS-Core (ARM) — заголовки для Cortex-M4F |
 | `STM32CubeF4/`                 | CMSIS-Device STM32F4xx + LL-драйверы из STM32CubeF4 V1.28.3 |
 | `FreeRTOS-Kernel/`             | ядро FreeRTOS, порт `GCC/ARM_CM4F`, `heap_4`, CMSIS-RTOS v2 |
-| `STM32_USB_Device_Library/`    | ST USB Device Library (Core + класс CDC) для `drivers/usb_cdc/` |
+| `STM32_USB_Device_Library/`    | ST USB Device Library (Core + класс CDC). **Сейчас не подключена**: USB CDC-драйвер не реализован, транспорт идёт через UART2. Оставлена для будущей активации (PLL_Q=7 → 48 МГц уже настроен в `bsp_clock.c`). |
 
 Принцип: «своих правок в third_party нет». Если нужна правка — она лежит в
 `hal_port/` или в виде патча в этой же папке с `*.patch`.
@@ -128,25 +164,41 @@ app
 ```
 
 #### `firmware/src/app/` — прикладной слой
-Конечный автомат приложения и FreeRTOS-задачи. Не знает о регистрах и пинах.
+Конечный автомат приложения, FreeRTOS-задачи, *_service-модули. Не знает
+о регистрах и пинах.
 
-- `inc/app_main.h` — точка входа `app_init()`/`app_run()`.
-- `inc/app_state.h` — конечный автомат (`BOOT/IDLE/MOVING/FAULT`).
-- `inc/app_events.h` — события, которыми задачи обмениваются.
+**Корень и общее состояние:**
+- `inc/app_main.h` — точка входа `app_init()` / `app_run()`.
+- `inc/app_state.h` — конечный автомат (`BOOT / IDLE / MOVING / FAULT`).
+- `inc/app_events.h` — общий enum событий между задачами.
 - `src/app_main.c`, `src/app_state.c` — реализация.
-- `inc/temp_service.h`, `src/temp_service.c` — состояние периодического опроса
-  DS18B20 (running/period/last value), мост между shell и task_diagnostic.
-- `src/tasks/` — по одной задаче на ответственность. Полная таблица
-  (приоритеты, стеки, периоды, шаблон task ↔ service) — в [tasks.md](tasks.md).
-  - `task_protocol.c` — приём байт из UART, кормит shell-парсер.
-  - `task_motor.c` — событийная: ждёт ISR-уведомление от `step_pwm`
-    о завершении движения, синхронизирует позицию, шлёт `$M`-телеметрию
-    и `!DONE MOVE`.
-  - `task_temp.c` — периодический опрос DS18B20, эмиссия `$T18,<ts>,<c10>`.
-  - `task_hall.c` — периодический опрос AH49E через ADC1, эмиссия `$H,...`.
-  - `task_probe.c` — самодиагностика STEP через ADC2 + DMA, эмиссия `$P,...`.
-  - `task_diagnostic.c` — LED-маяк 1 Гц (признак, что планировщик жив).
-  - `task_watchdog.c` — поддержка IWDG (заглушка, TODO).
+- `src/freertos_hooks.c` — хуки FreeRTOS (`vApplicationStackOverflowHook` и т.п.).
+
+**Сервисы — состояние подсистем + тонкие GPIO-обёртки:**
+Каждая подсистема имеет парный `*_service` со стандартными методами
+`init/start/stop/running/period_ms/publish/get_last`. CLI-команды дёргают
+сервис как «мост», задачи читают `running()`/`period_ms()` и публикуют
+свежее значение через `publish()`.
+
+| Сервис             | Файлы                                          | Что хранит / делает |
+|--------------------|------------------------------------------------|---------------------|
+| `temp_service`     | `inc/temp_service.h`, `src/temp_service.c`     | last `c10` от DS18B20 + флаг valid + период |
+| `hall_service`     | `inc/hall_service.h`, `src/hall_service.c`     | last `raw/centered` от AH49E + период |
+| `probe_service`    | `inc/probe_service.h`, `src/probe_service.c`   | last `freq_hz/adc` от STEP self-probe + период |
+| `motor_service`    | `inc/motor_service.h`, `src/motor_service.c`   | `pos/target/speed_sps`, EN/DIR GPIO, оркестрация `MOVE` через `step_pwm` |
+
+**FreeRTOS-задачи** (`src/tasks/`) — по одной задаче на ответственность.
+Полная таблица (приоритеты, стеки, периоды, шаблон task ↔ service) —
+в [tasks.md](tasks.md).
+
+- `task_protocol.c` — приём байт из UART, кормит shell-парсер.
+- `task_motor.c` — событийная: ждёт ISR-уведомление от `step_pwm`
+  о завершении движения, синхронизирует позицию, шлёт `$M` и `!DONE MOVE`.
+- `task_temp.c` — периодический опрос DS18B20, эмиссия `$T18`.
+- `task_hall.c` — периодический опрос AH49E через ADC1, эмиссия `$H`.
+- `task_probe.c` — самодиагностика STEP через ADC2 + DMA, эмиссия `$P`.
+- `task_diagnostic.c` — LED-маяк 1 Гц (признак, что планировщик жив).
+- `task_watchdog.c` — поддержка IWDG (заглушка, TODO).
 
 #### `firmware/src/bsp/` — Board Support Package
 Знает про **конкретную плату**: тактовая 168 МГц от HSE, конкретные пины,
@@ -160,70 +212,72 @@ app
 - `src/stm32f4xx_it.c` — таблица обработчиков прерываний (системные + периферия).
 
 #### `firmware/src/drivers/` — драйверы периферии MCU
-Тонкие обёртки над LL для каждой периферии: открыть/закрыть, дать колбэк/очередь
-данных, изолировать DMA. **Не знают о бизнес-смысле** передаваемых байтов.
+Тонкие обёртки над LL для каждой периферии: открыть/закрыть, дать колбэк/
+очередь данных, изолировать DMA. **Не знают о бизнес-смысле** передаваемых
+байтов.
 
-| Подпапка   | Назначение |
-|------------|------------|
-| `uart/`    | USART (логи/shell) |
-| `usb_cdc/` | USB CDC (основная связь с хостом) |
-| `spi/`     | SPI master |
-| `i2c/`     | I2C (EEPROM, ADS1115) |
-| `can/`     | CAN1 (через TJA1051) |
-| `adc/`     | внутренний ADC (ток/температура MCU) |
-| `timer/`   | таймеры (PWM для STEP, общие тики) |
-| `gpio/`    | универсальные хелперы для входов/выходов |
-| `flash/`   | стирание/запись страниц FLASH (для эмуляции EEPROM) |
-| `onewire/` | 1-Wire master через GPIO bit-bang + DWT микросекунды (для DS18B20) |
+| Подпапка     | Назначение |
+|--------------|------------|
+| `uart/`      | USART2 для текстового shell-CLI (TX через DMA1 Stream 6, RX через RXNE-IRQ → SPSC ring 256) |
+| `step_pwm/`  | TIM1_CH1 (AF1, advanced timer) — аппаратный PWM для STEP на PA8; UEV-ISR считает шаги, по достижении target шлёт `xTaskNotifyFromISR` в task_motor |
+| `adc/`       | ADC1 + DMA2 Stream 0, channel 1 (PA1) — непрерывное чтение AH49E в circular ring sample-buffer |
+| `adc_probe/` | ADC2 + DMA2 Stream 2, channel 0 (PA0) — STEP self-probe loopback PA8→PA0; раздельное ядро ADC чтобы не мешать AH49E |
+| `onewire/`   | 1-Wire master через GPIO bit-bang + DWT-микросекунды (для DS18B20 на PB12) |
+
+> **Удалены как не используемые** (`can/`, `i2c/`, `spi/`, `timer/`, `gpio/`,
+> `flash/`, `usb_cdc/`). Если такая периферия понадобится — соответствующие
+> подпапки добавляются заново. См. [pinout.md](pinout.md) → раздел
+> «Зарезервированные / в коде не используются».
 
 #### `firmware/src/devices/` — драйверы внешних чипов
 Используют `drivers/`, но добавляют логику конкретного устройства.
 
-| Подпапка       | Устройство |
-|----------------|------------|
-| `eeprom_24lc/` | I2C EEPROM Microchip 24LCxxx |
-| `stepper/`     | драйвер шагового двигателя (STEP/DIR/EN) |
-| `ads1115/`     | I2C 16-бит ADC TI ADS1115 (внешний АЦП тока) |
-| `tja1051/`     | CAN-трансивер NXP TJA1051 (управление standby pin) |
-| `ds18b20/`     | 1-Wire термосенсор Maxim/Dallas DS18B20 (через `drivers/onewire/`) |
+| Подпапка   | Устройство |
+|------------|------------|
+| `ah49e/`   | линейный аналоговый Hall-датчик AH49E (через `drivers/adc/`); подробно — [ah49e.md](ah49e.md) |
+| `ds18b20/` | 1-Wire термосенсор Maxim/Dallas DS18B20 (через `drivers/onewire/`); подробно — [ds18b20.md](ds18b20.md) |
+
+> **Удалены как не используемые** (`ads1115/`, `eeprom_24lc/`, `stepper/`,
+> `tja1051/`). См. [tasks.md](tasks.md) и историю репозитория.
 
 #### `firmware/src/middleware/` — переиспользуемые компоненты
 Платформо-нейтральные модули, тестируются юнит-тестами без прошивания.
 
-| Подпапка        | Ответственность |
-|-----------------|-----------------|
-| `ring_buffer/`  | lock-free кольцевой буфер для UART/USB |
-| `crc/`          | CRC-16/CCITT-FALSE (тот же, что на хосте) |
-| `protocol/`     | парсер кадров и заголовки, сгенерированные из YAML |
-| `shell/`        | текстовый CLI поверх UART (см. [cli.md](cli.md)) — диспетчер команд `PING/VER/MOVE/STOP/TELEM/TEMP/...` |
-| `logger/`       | структурированный лог в UART/USB-CDC |
-| `settings/`     | хранение настроек в EEPROM/эмуляции FLASH |
-| `motion/`       | планировщик движения (ускорение/торможение/S-curve) |
-| `uds/`          | минимальный сабсет UDS (ISO 14229) для прошивки/диагностики |
+**Реально используются:**
 
-`middleware/protocol/` отдельно: содержит `protocol_gen.h` — артефакт
-кодогенерации; правится **только** через изменение `shared/protocol/protocol.yaml`.
+| Подпапка    | Ответственность |
+|-------------|-----------------|
+| `shell/`    | текстовый CLI поверх UART2 (см. [cli.md](cli.md)) — диспетчер команд `PING/VER/STATE/MOVE/STOP/EN/DIR/MOTOR/TEMP/HALL/PROBE/HOME/MOVETO/HELP/RESET` |
+| `protocol/` | заглушка под бинарный TLV: `protocol_parser.{h,c}` (структуры frame'а, статусы) и `protocol_gen.h` (артефакт кодогенерации). **В сборку не подключён** — диспетчер кадров ещё не написан, транспорт идёт через текстовый shell. |
 
-`middleware/shell/` — узаконенное исключение из правила «middleware зовёт
-только hal_port». По смыслу shell — это диспетчер команд приложения,
-который удобно держать как отдельный переиспользуемый модуль; он напрямую
-вызывает `app/app_state`, `app/temp_service`, `devices/ds18b20`,
-`drivers/uart`. Его источник правды по протоколу — заголовок
-[shell.h](../firmware/src/middleware/shell/inc/shell.h) и [docs/cli.md](cli.md),
-а **не** `shared/protocol/protocol.yaml` (там описан бинарный TLV-канал).
+**Заглушки** (только `.gitkeep` или резерв под будущую разработку):
+`crc/`, `logger/`, `motion/`, `ring_buffer/`, `settings/`, `uds/`. Перечислены
+в архитектуре как «куда пойдут модули, когда будут писаться»: переиспользуемый
+кольцевой буфер, CRC-16/CCITT-FALSE, профилировщик движения и т.д.
+
+`middleware/shell/` — **узаконенное исключение** из правила «middleware зовёт
+только hal_port». По смыслу shell — диспетчер команд приложения, и он
+напрямую вызывает `app/app_state`, все четыре `app/*_service`,
+`devices/{ah49e,ds18b20}`, `drivers/{uart,adc_probe}`. Источник правды
+по этому протоколу — [shell.h](../firmware/src/middleware/shell/inc/shell.h)
++ [docs/cli.md](cli.md), а **не** `shared/protocol/protocol.yaml` (там описан
+другой, бинарный TLV-канал, ещё не задействованный).
 
 #### `firmware/src/hal_port/`
-Тонкая прослойка между прикладным/middleware-кодом и `drivers`/LL.
-Формализует контракт: «middleware вызывает только это». Меняя MCU, меняем
-реализацию `hal_port`, всё, что выше, остаётся нетронутым.
+Тонкая прослойка между прикладным/middleware-кодом и `drivers/LL`.
+Сейчас представлена **только заголовком-стабом** [hal_port.h](../firmware/src/hal_port/inc/hal_port.h)
+с интерфейсами `hal_uart_*` и `hal_tick_ms` — реализации (`hal_port.c`) пока
+нет. Фактически `middleware/shell` обращается к `drivers/uart` и `app/*_service`
+напрямую (см. оговорку выше). Когда абстракция реально потребуется (порт
+на другую MCU или хост-симуляция) — `hal_port.c` напишется здесь же.
 
 #### `firmware/src/config/`
 Конфигурационные заголовки, выбранные именно для этого проекта:
 
-- `FreeRTOSConfig.h` — приоритеты, тики, размер кучи RTOS.
+- `FreeRTOSConfig.h` — приоритеты, тики, размер кучи RTOS (см. [tasks.md](tasks.md)).
 - `stm32f4xx_ll_conf.h` — какие LL-модули включены (отрезаем неиспользуемые).
-- `usbd_conf.h` — параметры USB Device middleware.
-- `project_config.h` — наши собственные параметры (частота телеметрии, размеры буферов).
+- `usbd_conf.h` — параметры USB Device middleware. **Сейчас не используется**, но оставлен на случай активации USB CDC; см. оговорку в `third_party/STM32_USB_Device_Library`.
+- `project_config.h` — наши собственные параметры (`PROJ_MOTOR_MAX_SPEED_SPS` и т.п.).
 
 #### `firmware/src/startup/`
 - `startup_stm32f407xx.s` — таблица векторов и `Reset_Handler` (из CMSIS-Device).
@@ -232,9 +286,12 @@ app
 
 ### 5.6. `firmware/tests/unit/`
 Юнит-тесты прошивки, собираются под **хост-компилятор** (без MCU). По одному
-подкаталогу на тестируемый модуль:
+подкаталогу на тестируемый модуль: `ring_buffer/`, `crc/`, `protocol_parser/`,
+`motion/`.
 
-- `ring_buffer/`, `crc/`, `protocol_parser/`, `motion/`.
+**Сейчас все четыре — пустые `.gitkeep`-каталоги**: модули-кандидаты
+(`middleware/{ring_buffer,crc,motion}` + `protocol_parser`) ещё не написаны,
+писать тесты не на что. Заполняются по мере появления реальных модулей.
 
 Покрытие железа сюда не входит — это уровень `tests/integration/` сверху.
 
@@ -242,116 +299,72 @@ app
 
 ## 6. `software/` — десктопное GUI
 
+PySide6-приложение, общается с прошивкой по UART (текстовый CLI из
+[cli.md](cli.md)). Архитектура — **классический MVC**, источник правды
+по слоям — [`software/MVC.md`](../software/MVC.md).
+
 ### 6.1. Корень `software/`
 
-| Файл                      | Назначение |
-|---------------------------|------------|
-| `pyproject.toml`          | пакет `controller_app`, dev-extras |
-| `requirements.txt`        | runtime-зависимости (pin для воспроизводимости) |
-| `requirements-dev.txt`    | + pytest, ruff, mypy |
-| `.python-version`         | версия для pyenv |
-| `ruff.toml`               | конфигурация линтера/форматтера |
-| `pytest.ini`              | discovery, coverage, маркеры |
-| `mypy.ini`                | строгий режим |
-| `README.md`               | как запустить и тестировать |
+| Файл / папка       | Назначение |
+|--------------------|------------|
+| `run.py`           | точка входа: `python run.py` запускает GUI |
+| `requirements.txt` | runtime-зависимости (PySide6, pyserial, pyqtgraph, numpy) |
+| `README.md`        | быстрый старт, что умеет на сегодня |
+| `MVC.md`           | подробная раскладка слоёв и поток данных |
+| `controller_app/`  | пакет приложения |
 
-### 6.2. `software/resources/`
-Все Qt-ресурсы. Подключаются через `resources.qrc` и компилируются
-в `src/controller_app/resources_rc.py` (`pyrcc6`).
-
-| Подпапка        | Содержимое |
-|-----------------|------------|
-| `icons/`        | SVG/ICO иконки |
-| `ui/`           | `*.ui` от Qt Designer (опционально) |
-| `qss/`          | стили (например, `dark.qss`) |
-| `translations/` | `*.ts` для `lupdate`/`lrelease` (i18n) |
-
-### 6.3. `software/src/controller_app/` — пакет приложения
-
-Внутри — слоистая архитектура с однонаправленным графом зависимостей:
+### 6.2. `software/controller_app/` — пакет приложения
 
 ```
-ui  ──▶  models  ──▶  workers  ──▶  device  ──▶  protocol  ──▶  transport
-                                       └─────────▶  protocol  ◀┘
+controller_app/
+├── __main__.py            # python -m controller_app, wiring M / V / C
+├── models/                ─── M ────────────────────────────
+├── controllers/           ─── C ────────────────────────────
+├── views/                 ─── V ────────────────────────────
+└── resource/              ← статические ассеты (логотип и т.п.)
 ```
 
-Сверху вниз: UI знает о моделях, модели знают о воркерах, воркеры — о device,
-device — о протоколе и транспорте. Никаких «подъёмов» вверх по этой цепочке.
+**Правила MVC** (формализованы в `MVC.md`):
+- `models/` хранит состояние и общается с железом (парсер строк, коллекторы,
+  serial-worker). **Не знает про Qt-виджеты.**
+- `views/` показывает состояние и эмитит сигналы пользовательских действий.
+  **Не знает про serial и парсер.**
+- `controllers/` связывает первое со вторым. Только он знает обе стороны.
 
-#### `core/`
-Кросс-проектные сервисы приложения, не зависящие от Qt-специфики бизнес-кода:
+#### `controller_app/models/`
+- `device_model.py` — `DeviceModel`: состояние подключения, лог, последний DUMP. Эмитит Qt-сигналы.
+- `parser.py` — построчный диспетчер CLI (`+OK / -ERR / ! / # / $T18 / $H / $M / $P / $D`).
+- `probe_collector.py` — собирает 4096-сэмпловый `PROBE DUMP` из `$D`-строк.
+- `dump_snapshot.py` — datacclass для одного снимка DUMP.
+- `log_severity.py` — теги для цветного лога.
+- `serial_worker.py` — `pyserial` в `QThread` с неблокирующим чтением.
 
-- `settings.py` — обёртка `QSettings`.
-- `logger.py` — конфигурация `logging`.
-- `constants.py` — глобальные константы (org/app name, дефолтные таймауты).
+#### `controller_app/controllers/`
+- `device_controller.py` — клей: SerialWorker → parser → DeviceModel; команды от UI → SerialWorker.
 
-#### `transport/`
-Низкоуровневый слой передачи байтов. Один интерфейс — несколько реализаций.
+#### `controller_app/views/`
+- `main_window.py` — собирает панели в layout.
+- `panel.py` — общий базовый класс панелей.
+- `connection_panel.py` — выбор COM-порта, Connect/Disconnect.
+- `command_panel.py` — поле ввода CLI-команды + Send.
+- `cli_control_panel.py` — кнопки фиксированных команд (PING, VER, MOVE, …).
+- `log_panel.py` — цветной лог.
+- `dump_chart.py`, `scope_chart.py` — графики waveform на `pyqtgraph`.
+- `digital_readout.py`, `led.py`, `rotor_view.py` — индикаторные виджеты.
+- `theme.py` — стили.
+- `tabs/` — вкладки главного окна.
 
-- `base.py` — абстрактный `Transport`.
-- `serial_transport.py` — обычный COM (pyserial).
-- `usb_cdc_transport.py` — USB-CDC (тот же serial, но семантически другое).
-- `tcp_transport.py` — для удалённой отладки/симулятора.
-- `mock_transport.py` — in-memory, для тестов.
+#### `controller_app/resource/`
+- `izto_logo.png` — логотип.
 
-#### `protocol/`
-Кодек кадров, общая часть с прошивкой по форматам.
+### 6.3. Чего нет (по сравнению с «классической» структурой)
 
-- `messages.py` — dataclass-ы команд (генерируется из `shared/protocol/protocol.yaml`).
-- `codec.py` — `encode_frame` / `decode_frame`.
-- `crc.py` — тот же CRC-16/CCITT-FALSE, что и в прошивке.
-
-#### `device/`
-Высокоуровневый фасад устройства. Скрывает протокол.
-
-- `device.py` — корневой класс `Device(transport)`.
-- `motor.py`, `adc.py`, `diagnostics.py`, `settings_io.py` — функциональные подсистемы.
-
-#### `workers/`
-QObject-воркеры, живут в отдельных потоках через `QThread`. Изолируют блокирующий
-I/O от UI.
-
-- `connection_worker.py` — установление и поддержание соединения.
-- `telemetry_worker.py` — приём стрима телеметрии.
-- `flash_worker.py` — обновление прошивки (UDS/bootloader).
-
-#### `models/`
-Qt-модели данных и кольцевые буферы (для графиков).
-
-- `log_model.py` — `QAbstractListModel` для лога.
-- `settings_model.py` — модель настроек устройства (для редактора).
-- `telemetry_buffer.py` — `deque(maxlen=...)` под графики.
-
-#### `ui/`
-Только представление и обработка пользовательских действий.
-
-- `main_window.py` — главное окно.
-- `widgets/` — компонуемые виджеты (панель соединения, управление мотором, графики, лог, статус, LED).
-- `dialogs/` — модальные диалоги (настройки, about, обновление прошивки).
-- `icons.py` — фабрики `QIcon` из `:/icons/...` qrc-путей.
-
-`resources_rc.py` — артефакт компиляции `resources.qrc`. Регенерируется
-командой `pyrcc6`, в репозитории лежит как сгенерированный модуль.
-
-### 6.4. `software/tests/`
-
-| Подпапка       | Назначение |
-|----------------|------------|
-| `conftest.py`  | session-фикстуры (offscreen QPA для CI без X) |
-| `unit/`        | юнит-тесты протокола, CRC, буферов |
-| `integration/` | тесты `Device + MockTransport` без железа |
-| `ui/`          | Qt-тесты с `pytest-qt` |
-
-Тесты помечены маркерами `ui`/`integration` — на CI без графики UI-тесты
-запускаются под `QT_QPA_PLATFORM=offscreen`, integration с реальной платой —
-не запускаются вовсе.
-
-### 6.5. `software/packaging/`
-Артефакты сборки дистрибутива:
-
-- `pyinstaller.spec` — описание сборки `controller_app` в .exe/папку.
-- `build_windows.bat`, `build_linux.sh` — обвязки.
-- `installer/inno_setup.iss` — Inno Setup для .exe-инсталлятора Windows.
+`software/tests/`, `software/packaging/`, `pyproject.toml`, `mypy.ini`,
+`pytest.ini`, `ruff.toml`, отдельные слои `transport/` / `protocol/` /
+`device/` / `workers/`, генерированные `messages.py` — **в проекте этого
+сейчас нет**. Хост-приложение пока маленькое, отдельный кодек/транспорт-слой
+не нужен (текстовый CLI парсится одним `parser.py`). Если разрастётся
+до бинарного TLV-канала — слои добавятся, и тогда обновить этот раздел.
 
 ---
 
@@ -359,9 +372,9 @@ Qt-модели данных и кольцевые буферы (для граф
 
 | Файл / папка        | Назначение |
 |---------------------|------------|
-| `ci/`               | конфиги/скрипты CI (workflows GitHub Actions/Jenkins/...) |
 | `flash_release.sh`  | прошивка релизного `.elf` через OpenOCD/ST-Link |
 | `make_release.py`   | сборка релизного артефакта (firmware + host) с чексуммами |
+| `ci/`               | конфиги/скрипты CI. **Сейчас пустой `.gitkeep`-каталог** — CI ещё не настроен, заглушка под workflows GitHub Actions / Jenkins. |
 
 Это **не** часть продукта — это поддержка процесса разработки.
 
@@ -384,29 +397,38 @@ Qt-модели данных и кольцевые буферы (для граф
 
 ## 9. Сквозные правила
 
-1. **Зависимости только сверху вниз.** Прикладной код прошивки не подключает
-   `stm32f4xx.h` напрямую — только через `hal_port`. UI хоста не подключает
-   `serial` напрямую — только через `transport.base.Transport`.
+1. **Зависимости только сверху вниз.** Прикладной код прошивки не должен
+   подключать `stm32f4xx.h` напрямую — только через `hal_port`. (На сегодня
+   `hal_port` ещё стаб; пока правило соблюдается «по дисциплине», а не
+   компилятором — см. §5.5 о `middleware/shell` как узаконенном исключении.)
+   На хосте: views ничего не знают о serial-порте напрямую — только
+   через controller.
 2. **Один источник правды.** Пины — `bsp_pins.h`. Версия прошивки —
    `bsp_version.h`. Бинарный протокол — `shared/protocol/protocol.yaml`.
    Текстовый shell-протокол — [shell.h](../firmware/src/middleware/shell/inc/shell.h)
-   плюс [docs/cli.md](cli.md). Карта памяти — linker-скрипт. Документация
-   ссылается на эти источники, не дублирует их.
-3. **Сначала тест, потом фича.** Любое изменение middleware/protocol/CRC
-   сопровождается юнит-тестом в `firmware/tests/unit/` или `software/tests/unit/`.
+   плюс [docs/cli.md](cli.md). Карта памяти — linker-скрипт. FreeRTOS-задачи
+   и сервисы — [tasks.md](tasks.md). Документация ссылается на эти источники,
+   не дублирует их.
+3. **Сначала тест, потом фича — для middleware/protocol/CRC**, когда они
+   будут реализованы. Сейчас этих модулей в коде нет, тесты в `firmware/tests/unit/`
+   и в `software/` — заглушки. Это запланированное состояние, а не действующая
+   практика.
 4. **Ничего лишнего в `third_party/`.** Сторонний код не правим. Если нужна
    правка — обёртка живёт в `hal_port/` или `middleware/`, а не в чужих исходниках.
 5. **Кодогенерируемые файлы помечаются комментарием «НЕ РЕДАКТИРОВАТЬ ВРУЧНУЮ»**
    и регенерируются при изменении `protocol.yaml` в одном коммите с правкой YAML.
+   (Сейчас актуально только для `middleware/protocol/inc/protocol_gen.h`,
+   как только бинарный TLV-канал будет подключён к диспетчеру.)
 
 ## 10. Куда добавлять новый код
 
 | Хочу добавить…                                  | Куда |
 |--------------------------------------------------|------|
-| новую команду протокола                          | `shared/protocol/protocol.yaml` → регенерация → обработчик в `firmware/src/app/src/tasks/task_protocol.c` и метод в `software/.../device/` |
-| новую периферию MCU                              | `firmware/src/drivers/<peripheral>/` |
-| новое внешнее устройство (чип)                   | `firmware/src/devices/<chip>/` |
-| новую FreeRTOS-задачу                            | `firmware/src/app/src/tasks/` |
-| новый виджет GUI                                 | `software/src/controller_app/ui/widgets/` |
-| новый транспорт хоста                            | `software/src/controller_app/transport/` (наследник `Transport`) |
-| решение, которое стоит зафиксировать «навсегда» | новый ADR в `docs/adr/NNNN-...md` |
+| новую CLI-команду (текстовый канал)              | обработчик `cmd_<x>` в [shell.c](../firmware/src/middleware/shell/src/shell.c), регистрация в `s_cmds[]`; описание в [cli.md](cli.md) и в `cmd_help()` |
+| новую команду бинарного протокола (план)         | `shared/protocol/protocol.yaml` → регенерация → диспетчер во `firmware/src/middleware/protocol/` (когда будет написан) |
+| новую FreeRTOS-задачу                            | `firmware/src/app/src/tasks/`; зарегистрировать в `app_main.c::app_run()`, добавить парный `*_service`, обновить [tasks.md](tasks.md) |
+| новый сенсор / актуатор                          | `firmware/src/devices/<chip>/` (драйвер) + `firmware/src/app/{inc,src}/<x>_service.{h,c}` (состояние + CLI-glue) + `task_<x>.c` |
+| новую периферию MCU                              | `firmware/src/drivers/<peripheral>/` (если удалена ранее как заглушка — пересоздать) |
+| новый виджет/панель GUI                          | `software/controller_app/views/`; controller связывает с моделью |
+| новую модель данных GUI                          | `software/controller_app/models/`; controller подписывается на её сигналы |
+| решение, которое стоит зафиксировать «навсегда»  | новый ADR в `docs/adr/NNNN-...md` |

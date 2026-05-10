@@ -29,7 +29,7 @@
    ┌──────────────────────────────────────────────────┐
    │ motor_service:                                   │
    │   move/abort/sync_position/register_owner        │
-   │   pos, target, speed_sps  (volatile)             │
+   │   pos, target, speed_sps, position_zero          │
    │   en, dir                  → реальные GPIO       │
    └──────────────────────────────────────────────────┘
         │                                 ▲
@@ -81,15 +81,18 @@ TBD.
 ```
  [task_protocol]              [task_motor]                [TIM1 ISR]
        │                            │                          │
-       │  MOVE 1000 5000 1000       │                          │
+       │  MOVE 1000 5000            │                          │
        │  (CLI string)              │                          │
        │                            │                          │
        │  motor_service_move()      │                          │
-       │   ├─ step_pwm_set_speed    │                          │
-       │   ├─ set_dir / set_en      │                          │
+       │   ├─ step_pwm_set_speed_sps│                          │
+       │   ├─ set_dir по знаку steps│                          │
+       │   ├─ set_en(true)          │                          │
        │   ├─ s_target = pos+steps  │                          │
        │   └─ step_pwm_start(N, h)  │                          │
        │                            │                          │
+       │  app_state_set(MOVING)     │                          │
+       │  !STATE MOVING ───────────►│                          │
        │  +OK MOVE …  ────────────► │                          │
        │  (отвечает мгновенно)      │                          │
        │                            │ ulTaskNotifyTake(period) │
@@ -127,10 +130,15 @@ TBD.
 
 | Команда                              | Ответ при успехе                         | Возможные `-ERR`                         |
 |--------------------------------------|------------------------------------------|------------------------------------------|
-| `MOVE <steps> <speed_sps>`           | `+OK MOVE steps=… speed=…`               | `bad-number`, `bad-speed`, `fault`, `busy`, `bad-steps`, `not-ready` |
-| `STOP`                               | `+OK STOP` (с эмиссией `!STATE IDLE`)    | —                                        |
+| `MOVE <steps> <speed_sps>`           | `!STATE MOVING` + `+OK MOVE steps=… speed=…`, по завершении `!DONE MOVE` + `!STATE IDLE` | `bad-number`, `bad-speed`, `bad-steps`, `busy`, `not-ready`, `fault` |
+| `STOP`                               | `+OK STOP` + `!STATE IDLE` (если был MOVING) | —                                    |
 | `MOVETO <pos>`                       | (не реализовано)                         | `not-implemented` (TBD)                  |
 | `HOME`                               | (не реализовано)                         | `not-implemented` (TBD)                  |
+
+> **Знак `steps` задаёт направление.** `MOVE -1000 5000` → `motor_service_move`
+> сам выставит `DIR BCK` и `EN ON` — ручная команда `DIR ...` перед `MOVE`
+> перезапишется. Это сделано чтобы хосту не нужно было думать, что переключать
+> первым; см. [motor_service.c:88-107](../firmware/src/app/src/motor_service.c).
 
 > Профиль скорости (трапеция / S-curve) пока не реализован — движение идёт
 > на постоянной скорости. Когда заведём, **ускорение появится отдельной
@@ -158,6 +166,7 @@ TBD.
 | `MOTOR ON`          | Включить поток `$M`                     | `+OK MOTOR ON` |
 | `MOTOR OFF`         | Выключить поток                         | `+OK MOTOR OFF` |
 | `MOTOR RATE <hz>`   | Частота публикации (1..50 Hz, дефолт 10)| `+OK MOTOR RATE <hz>` / `-ERR MOTOR bad-rate min=1 max=50` |
+| `MOTOR ZERO`        | Прервать движение (если идёт) и обнулить `pos`/`target`. Новая «нулевая» точка — текущая физическая позиция. | `+OK MOTOR ZERO pos=0` |
 
 Поток `$M`:
 ```
