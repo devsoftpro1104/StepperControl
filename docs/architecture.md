@@ -45,6 +45,7 @@ project-root/
 | `architecture.md`           | этот файл — карта проекта |
 | `protocol.md`               | человекочитаемое описание бинарного протокола (источник правды — YAML в `shared/`) |
 | `cli.md`                    | текстовый shell-протокол поверх UART (грамматика команд, стрим телеметрии, шаблон парсера на PySide6); реализация — `middleware/shell/` |
+| `tasks.md`                  | FreeRTOS-задачи прошивки: приоритеты, стеки, периоды, шаблон task ↔ service |
 | `pinout.md`                 | таблица «функция → пин MCU», синхронна с `bsp_pins.h` |
 | `memory_map.md`             | разбиение FLASH/RAM, синхронно с linker-скриптом |
 | `user_manual.md`            | как пользоваться GUI |
@@ -135,12 +136,17 @@ app
 - `src/app_main.c`, `src/app_state.c` — реализация.
 - `inc/temp_service.h`, `src/temp_service.c` — состояние периодического опроса
   DS18B20 (running/period/last value), мост между shell и task_diagnostic.
-- `src/tasks/` — по одной задаче на ответственность:
+- `src/tasks/` — по одной задаче на ответственность. Полная таблица
+  (приоритеты, стеки, периоды, шаблон task ↔ service) — в [tasks.md](tasks.md).
   - `task_protocol.c` — приём байт из UART, кормит shell-парсер.
-  - `task_motor.c` — исполнение профиля движения.
-  - `task_telemetry.c` — периодическая отправка стрима `$T,...`.
-  - `task_diagnostic.c` — LED-маяк, поллинг DS18B20, эмиссия `$T18,...`.
-  - `task_watchdog.c` — поддержка IWDG.
+  - `task_motor.c` — событийная: ждёт ISR-уведомление от `step_pwm`
+    о завершении движения, синхронизирует позицию, шлёт `$M`-телеметрию
+    и `!DONE MOVE`.
+  - `task_temp.c` — периодический опрос DS18B20, эмиссия `$T18,<ts>,<c10>`.
+  - `task_hall.c` — периодический опрос AH49E через ADC1, эмиссия `$H,...`.
+  - `task_probe.c` — самодиагностика STEP через ADC2 + DMA, эмиссия `$P,...`.
+  - `task_diagnostic.c` — LED-маяк 1 Гц (признак, что планировщик жив).
+  - `task_watchdog.c` — поддержка IWDG (заглушка, TODO).
 
 #### `firmware/src/bsp/` — Board Support Package
 Знает про **конкретную плату**: тактовая 168 МГц от HSE, конкретные пины,

@@ -25,7 +25,21 @@
       "Bash(timeout 4 ./.venv/Scripts/python.exe -u run.py)",
       "Bash(tasklist)",
       "Bash(wait)",
-      "PowerShell(cmake --build firmware/build/debug 2>&1)"
+      "PowerShell(cmake --build firmware/build/debug 2>&1)",
+      "PowerShell(Get-ChildItem -Path c:\\\\STM32\\\\StepperControl\\\\firmware\\\\src -Recurse -Directory -Force | ForEach-Object { $_.FullName })",
+      "PowerShell($folders = @\\('can','i2c','flash','gpio','spi','timer','usb_cdc'\\); foreach \\($f in $folders\\) { $p = \"c:\\\\STM32\\\\StepperControl\\\\firmware\\\\src\\\\drivers\\\\$f\"; Write-Output \"=== $p ===\"; if \\(Test-Path $p\\) { Get-ChildItem $p -Recurse -Force | ForEach-Object { Write-Output \\(\"  \" + $_.FullName + \"  \\(\" + $_.Length + \"\\)\"\\) } } })",
+      "PowerShell($folders = @\\('ads1115','eeprom_24lc','stepper','tja1051'\\); foreach \\($f in $folders\\) { $p = \"c:\\\\STM32\\\\StepperControl\\\\firmware\\\\src\\\\devices\\\\$f\"; Write-Output \"=== $p ===\"; if \\(Test-Path $p\\) { Get-ChildItem $p -Recurse -Force | ForEach-Object { Write-Output \\(\"  \" + $_.FullName + \"  \\(\" + $_.Length + \"\\)\"\\) } } })",
+      "PowerShell($folders = @\\('crc','logger','motion','ring_buffer','settings','uds'\\); foreach \\($f in $folders\\) { $p = \"c:\\\\STM32\\\\StepperControl\\\\firmware\\\\src\\\\middleware\\\\$f\"; Write-Output \"=== $p ===\"; if \\(Test-Path $p\\) { Get-ChildItem $p -Recurse -Force | ForEach-Object { Write-Output \\(\"  \" + $_.FullName + \"  \\(\" + $_.Length + \"\\)\"\\) } } })",
+      "PowerShell(Get-ChildItem c:\\\\STM32\\\\StepperControl\\\\docs, c:\\\\STM32\\\\StepperControl\\\\software, c:\\\\STM32\\\\StepperControl\\\\tests, c:\\\\STM32\\\\StepperControl\\\\tools, c:\\\\STM32\\\\StepperControl\\\\shared -Recurse -Force | ForEach-Object { Write-Output \\($_.FullName + \"  \\(\" + $_.Length + \"\\)\"\\) })",
+      "PowerShell(Get-ChildItem c:\\\\STM32\\\\StepperControl\\\\tests -Recurse -Force | ForEach-Object { Write-Output \\($_.FullName + \"  \\(\" + $_.Length + \"\\)\"\\) })",
+      "PowerShell(Get-ChildItem c:\\\\STM32\\\\StepperControl\\\\firmware\\\\tests, c:\\\\STM32\\\\StepperControl\\\\shared -Recurse -Force | ForEach-Object { Write-Output \\($_.FullName + \"  \\(\" + $_.Length + \"\\)\"\\) })",
+      "PowerShell(Get-ChildItem c:\\\\STM32\\\\StepperControl\\\\tools -Recurse -Force | ForEach-Object { Write-Output \\($_.FullName + \"  \\(\" + $_.Length + \"\\)\"\\) })",
+      "PowerShell(Get-ChildItem c:\\\\STM32\\\\StepperControl\\\\firmware\\\\src\\\\app -Recurse -Force | ForEach-Object { Write-Output \\($_.FullName + \"  \\(\" + $_.Length + \"\\)\"\\) })",
+      "PowerShell(Get-ChildItem c:\\\\STM32\\\\StepperControl\\\\firmware\\\\src\\\\bsp, c:\\\\STM32\\\\StepperControl\\\\firmware\\\\src\\\\hal_port, c:\\\\STM32\\\\StepperControl\\\\firmware\\\\src\\\\config -Recurse -Force | ForEach-Object { Write-Output \\($_.FullName + \"  \\(\" + $_.Length + \"\\)\"\\) })",
+      "PowerShell($drivers = @\\('can','i2c','flash','gpio','spi','timer','usb_cdc'\\); $devices = @\\('ads1115','eeprom_24lc','stepper','tja1051'\\); foreach \\($f in $drivers\\) { Remove-Item -Recurse -Force -LiteralPath \"c:\\\\STM32\\\\StepperControl\\\\firmware\\\\src\\\\drivers\\\\$f\" }; foreach \\($f in $devices\\) { Remove-Item -Recurse -Force -LiteralPath \"c:\\\\STM32\\\\StepperControl\\\\firmware\\\\src\\\\devices\\\\$f\" }; Get-ChildItem c:\\\\STM32\\\\StepperControl\\\\firmware\\\\src\\\\drivers, c:\\\\STM32\\\\StepperControl\\\\firmware\\\\src\\\\devices | Select-Object FullName)",
+      "PowerShell(Get-ChildItem c:\\\\STM32\\\\StepperControl\\\\firmware\\\\src\\\\drivers, c:\\\\STM32\\\\StepperControl\\\\firmware\\\\src\\\\devices | ForEach-Object { Write-Output $_.FullName })",
+      "PowerShell(git -C c:\\\\STM32\\\\StepperControl status --short)",
+      "PowerShell(Get-ChildItem c:\\\\STM32\\\\StepperControl\\\\firmware\\\\src\\\\app\\\\src\\\\tasks | ForEach-Object { Write-Output \\($_.Name + \"  \" + $_.Length\\) })"
     ],
     "additionalDirectories": [
       "C:\\Users\\admin\\.claude\\projects\\c--STM32-StepperControl",
