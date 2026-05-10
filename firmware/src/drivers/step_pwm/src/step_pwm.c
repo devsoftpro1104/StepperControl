@@ -45,8 +45,21 @@ void step_pwm_init(void) {
     LL_AHB1_GRP1_EnableClock(LL_AHB1_GRP1_PERIPH_GPIOA);
     LL_APB2_GRP1_EnableClock(LL_APB2_GRP1_PERIPH_TIM1);
 
-    /* PA8 → AF1 (TIM1_CH1). Был output из bsp_gpio_init() — переписываем. */
+    /* DIR/EN — обычные GPIO push-pull. Cold-state ODR=0:
+       EN active-low → драйвер сразу enabled; DIR=0 → MOTOR_DIR_FRW.
+       Семантика дёргается из motor_service (см. motor_service.c). */
     LL_GPIO_InitTypeDef g = {0};
+    g.Mode       = LL_GPIO_MODE_OUTPUT;
+    g.Speed      = LL_GPIO_SPEED_FREQ_LOW;
+    g.OutputType = LL_GPIO_OUTPUT_PUSHPULL;
+    g.Pull       = LL_GPIO_PULL_NO;
+    g.Pin        = PIN_DIR_PIN;
+    LL_GPIO_Init(PIN_DIR_PORT, &g);
+    g.Pin        = PIN_EN_PIN;
+    LL_GPIO_Init(PIN_EN_PORT, &g);
+
+    /* STEP=PA8 → AF1 (TIM1_CH1). До step_pwm_start() MOE=0 — линия в Hi-Z. */
+    g = (LL_GPIO_InitTypeDef){0};
     g.Pin        = PIN_STEP_PIN;
     g.Mode       = LL_GPIO_MODE_ALTERNATE;
     g.Speed      = LL_GPIO_SPEED_FREQ_HIGH;

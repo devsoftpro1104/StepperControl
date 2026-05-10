@@ -10,26 +10,18 @@
 #include "stm32f4xx_ll_gpio.h"
 
 static void bsp_gpio_init(void) {
-    LL_AHB1_GRP1_EnableClock(LL_AHB1_GRP1_PERIPH_GPIOA);
     LL_AHB1_GRP1_EnableClock(LL_AHB1_GRP1_PERIPH_GPIOD);
 
+    /* LED статус. Пины шагового драйвера (STEP/DIR/EN) — в step_pwm_init(),
+       пины UART/ADC/1-Wire — в их собственных *_init(). Здесь только то, что
+       не принадлежит ни одной подсистеме. */
     LL_GPIO_InitTypeDef gpio = {0};
     gpio.Mode       = LL_GPIO_MODE_OUTPUT;
     gpio.Speed      = LL_GPIO_SPEED_FREQ_LOW;
     gpio.OutputType = LL_GPIO_OUTPUT_PUSHPULL;
     gpio.Pull       = LL_GPIO_PULL_NO;
-
-    /* LED статус */
-    gpio.Pin = PIN_LED_STATUS_PIN;
+    gpio.Pin        = PIN_LED_STATUS_PIN;
     LL_GPIO_Init(PIN_LED_STATUS_PORT, &gpio);
-
-    /* Шаговый драйвер: DIR, EN — обычные GPIO push-pull.
-       STEP инициализируется в step_pwm_init() как AF1 (TIM1_CH1) — здесь не трогаем,
-       чтобы не сбросить alt-function во время bring-up'а. */
-    gpio.Pin = PIN_DIR_PIN;
-    LL_GPIO_Init(PIN_DIR_PORT, &gpio);
-    gpio.Pin = PIN_EN_PIN;
-    LL_GPIO_Init(PIN_EN_PORT, &gpio);
 }
 
 void bsp_init(void) {

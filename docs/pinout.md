@@ -8,8 +8,8 @@
 | Функция            | Пин     | Перифер.   | Где инициализируется                                                                 |
 |--------------------|---------|------------|--------------------------------------------------------------------------------------|
 | STEP               | **PA8** | TIM1_CH1, AF1 (PWM) | [step_pwm.c](../firmware/src/drivers/step_pwm/src/step_pwm.c) — `step_pwm_init()` |
-| DIR                | **PA9** | GPIO out, push-pull | [bsp.c](../firmware/src/bsp/src/bsp.c) — `bsp_gpio_init()`; полярность 0=FRW, 1=BCK |
-| EN                 | **PA10**| GPIO out, push-pull | [bsp.c](../firmware/src/bsp/src/bsp.c) — **active-LOW** (LOW = драйвер включён)   |
+| DIR                | **PA9** | GPIO out, push-pull | [step_pwm.c](../firmware/src/drivers/step_pwm/src/step_pwm.c) — `step_pwm_init()`; полярность 0=FRW, 1=BCK |
+| EN                 | **PA10**| GPIO out, push-pull | [step_pwm.c](../firmware/src/drivers/step_pwm/src/step_pwm.c) — **active-LOW** (LOW = драйвер включён)   |
 | STEP self-probe    | **PA0** | ADC2_IN0   | [adc_probe.c](../firmware/src/drivers/adc_probe/src/adc_probe.c) — `adc_probe_init()`; перемычка PA8→PA0 |
 | Hall AH49E         | **PA1** | ADC1_IN1   | [adc.c](../firmware/src/drivers/adc/src/adc.c) — `adc_init()`; аналог, Vout≈Vcc/2 при B=0 |
 | UART2 TX           | **PA2** | USART2 AF7 | [uart.c](../firmware/src/drivers/uart/src/uart.c) — `uart2_init()`; 115200 8N1   |

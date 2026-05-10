@@ -48,7 +48,7 @@ SYSCLK (168 MHz)
 | Периферия         | Шина | Тактовая          | Где включается клок |
 |-------------------|------|-------------------|----------------------|
 | PWR               | APB1 | PCLK1 = 42 МГц    | [bsp_clock.c](../firmware/src/bsp/src/bsp_clock.c) — нужен до записи `PWR->CR` (VOS) |
-| GPIOA             | AHB1 | HCLK = 168 МГц    | [bsp.c](../firmware/src/bsp/src/bsp.c) — `bsp_gpio_init()`; повторно re-enable в `uart2_init`, `step_pwm_init`, `adc_init`, `adc_probe_init` (idempotent) |
+| GPIOA             | AHB1 | HCLK = 168 МГц    | первый по порядку в `bsp_init` — [uart.c](../firmware/src/drivers/uart/src/uart.c) — `uart2_init()`; повторно re-enable в `step_pwm_init`, `adc_init`, `adc_probe_init` (idempotent) |
 | GPIOB             | AHB1 | HCLK = 168 МГц    | [onewire.c](../firmware/src/drivers/onewire/src/onewire.c) — `ow_init()`, нужен для PB12 (DS18B20 1-Wire) |
 | GPIOD             | AHB1 | HCLK = 168 МГц    | [bsp.c](../firmware/src/bsp/src/bsp.c) — `bsp_gpio_init()` (LED статус) |
 | USART2 (shell)    | APB1 | PCLK1 = 42 МГц    | [uart.c](../firmware/src/drivers/uart/src/uart.c) — `uart2_init()`, baud 115200 |
