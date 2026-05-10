@@ -1,0 +1,4 @@
+kivy>=2.3
+pyserial>=3.5
+# для будущих графиков (Sensors / Motor scope, не используется в MVP):
+kivy_garden.graph>=0.4
