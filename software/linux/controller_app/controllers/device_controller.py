@@ -15,9 +15,9 @@ from typing import Optional
 from kivy.clock import Clock
 
 from ..models import (
-    AsyncEvent, CommentEvent, DeviceModel, DumpLine, ErrEvent,
+    AsyncEvent, CommentEvent, DeviceModel, DumpLine, DumpSnapshot, ErrEvent,
     HallSample, LogSeverity, MotorSample, OkEvent, parse_line,
-    ProbeSample, SerialWorker, TempSample, UnknownLine,
+    ProbeDumpCollector, ProbeSample, SerialWorker, TempSample, UnknownLine,
 )
 
 
@@ -35,6 +35,7 @@ class DeviceController:
     def __init__(self, model: DeviceModel) -> None:
         self._model:  DeviceModel = model
         self._worker: Optional[SerialWorker] = None
+        self._probe:  ProbeDumpCollector = ProbeDumpCollector()
 
     # ---- API для view --------------------------------------------------
 
@@ -111,6 +112,8 @@ class DeviceController:
             return
 
         if isinstance(evt, OkEvent):
+            if self._probe.feed_ok(evt.payload) and self._probe.complete:
+                self._emit_dump()
             self._model.append_log(f"+OK {evt.payload}", LogSeverity.OK)
             self._model.push_ok(evt.payload)
             return
@@ -126,8 +129,7 @@ class DeviceController:
             self._model.append_log(f"# {evt.text}", LogSeverity.CMT)
             return
         if isinstance(evt, DumpLine):
-            # MVP: PROBE DUMP не визуализируется (см. README) — сырые $D
-            # просто пропускаем.
+            self._probe.feed_line(evt)
             return
 
         if isinstance(evt, MotorSample):
@@ -148,3 +150,25 @@ class DeviceController:
             return
 
         self._model.append_log(f"[stream] {evt}", LogSeverity.STREAM)
+
+    # ---- внутреннее ---------------------------------------------------
+
+    def _emit_dump(self) -> None:
+        samples   = self._probe.samples_array().copy()
+        sample_hz = self._probe.sample_hz
+        lines     = self._probe.lines_seen
+        n         = samples.size
+
+        adc_min = int(samples.min()) if n else 0
+        adc_max = int(samples.max()) if n else 0
+        win_us  = (n * 1e6 / sample_hz) if sample_hz else 0.0
+
+        self._model.append_log(
+            f"[dump] lines={lines}/32  samples={n}  {sample_hz} Hz  "
+            f"window={win_us:.1f} µs  adc=[{adc_min}..{adc_max}]",
+            LogSeverity.OK,
+        )
+        self._model.set_dump(DumpSnapshot(
+            samples=samples, sample_hz=sample_hz, lines_seen=lines,
+        ))
+        self._probe.reset()

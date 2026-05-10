@@ -14,7 +14,9 @@
       "Bash(xargs wc -l)",
       "Bash(python -m compileall -q \"c:\\\\STM32\\\\StepperControl\\\\software\\\\linux\\\\controller_app\")",
       "Bash(python -c \"import ast, pathlib, sys; root=pathlib.Path\\(r'c:\\\\STM32\\\\StepperControl\\\\software\\\\linux'\\); [ast.parse\\(p.read_text\\(encoding='utf-8'\\), p.name\\) for p in root.rglob\\('*.py'\\)]; print\\('OK', len\\(list\\(root.rglob\\('*.py'\\)\\)\\), 'files'\\)\")",
-      "Bash(\"c:/STM32/StepperControl/software/.venv/Scripts/python.exe\" -m pip install -r \"c:/STM32/StepperControl/software/linux/requirements.txt\")"
+      "Bash(\"c:/STM32/StepperControl/software/.venv/Scripts/python.exe\" -m pip install -r \"c:/STM32/StepperControl/software/linux/requirements.txt\")",
+      "Bash(\"c:/STM32/StepperControl/software/.venv/Scripts/python.exe\" -c \"import ast, pathlib; root=pathlib.Path\\(r'c:\\\\STM32\\\\StepperControl\\\\software\\\\linux'\\); [ast.parse\\(p.read_text\\(encoding='utf-8'\\), p.name\\) for p in root.rglob\\('*.py'\\)]; print\\('OK', len\\(list\\(root.rglob\\('*.py'\\)\\)\\), 'files'\\)\")",
+      "Bash(c:/STM32/StepperControl/software/.venv/Scripts/python.exe -c ' *)"
     ]
   }
 }

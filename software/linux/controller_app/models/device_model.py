@@ -14,6 +14,7 @@ from typing import Optional
 
 from kivy.event import EventDispatcher
 
+from .dump_snapshot import DumpSnapshot
 from .log_severity import LogSeverity
 
 
@@ -24,6 +25,7 @@ class DeviceModel(EventDispatcher):
     __events__ = (
         "on_connection_changed",        # (connected: bool, port: str)
         "on_log_appended",              # (text: str, severity: str)
+        "on_dump_completed",            # (snap: DumpSnapshot,)
 
         "on_motor_sample_received",     # (sample,)
         "on_temp_sample_received",      # (sample,)
@@ -39,6 +41,7 @@ class DeviceModel(EventDispatcher):
         super().__init__(**kwargs)
         self._connected: bool = False
         self._port: str = ""
+        self._last_dump: Optional[DumpSnapshot] = None
 
     # ---- read access ----
 
@@ -49,6 +52,10 @@ class DeviceModel(EventDispatcher):
     @property
     def port(self) -> str:
         return self._port
+
+    @property
+    def last_dump(self) -> Optional[DumpSnapshot]:
+        return self._last_dump
 
     # ---- mutations (для контроллера) ----
 
@@ -61,6 +68,10 @@ class DeviceModel(EventDispatcher):
 
     def append_log(self, text: str, severity: str = LogSeverity.RAW) -> None:
         self.dispatch("on_log_appended", text, severity)
+
+    def set_dump(self, snap: DumpSnapshot) -> None:
+        self._last_dump = snap
+        self.dispatch("on_dump_completed", snap)
 
     # ---- стримы датчиков (тонкие пуш-методы, без буферизации) -----------
 
@@ -91,6 +102,7 @@ class DeviceModel(EventDispatcher):
 
     def on_connection_changed(self, *_a, **_k) -> None: ...
     def on_log_appended(self, *_a, **_k) -> None: ...
+    def on_dump_completed(self, *_a, **_k) -> None: ...
     def on_motor_sample_received(self, *_a, **_k) -> None: ...
     def on_temp_sample_received(self, *_a, **_k) -> None: ...
     def on_hall_sample_received(self, *_a, **_k) -> None: ...

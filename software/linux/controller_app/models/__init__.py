@@ -9,19 +9,21 @@
 """
 
 from .device_model import DeviceModel
+from .dump_snapshot import DumpSnapshot
 from .log_severity import LogSeverity
 from .parser import (
     AsyncEvent, CommentEvent, DumpLine, ErrEvent, Event, HallSample,
     MotorSample, OkEvent, ProbeSample, TempSample, UnknownLine,
     parse_line,
 )
+from .probe_collector import ProbeDumpCollector
 from .serial_worker import SerialWorker
 
 __all__ = [
-    "DeviceModel", "LogSeverity",
+    "DeviceModel", "DumpSnapshot", "LogSeverity",
     "parse_line",
     "AsyncEvent", "CommentEvent", "DumpLine", "ErrEvent", "Event",
     "HallSample", "MotorSample", "OkEvent", "ProbeSample",
     "TempSample", "UnknownLine",
-    "SerialWorker",
+    "ProbeDumpCollector", "SerialWorker",
 ]

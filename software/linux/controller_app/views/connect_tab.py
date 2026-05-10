@@ -1,55 +1,64 @@
-"""Вкладка СОЕДИНЕНИЕ: COM-порт + Refresh + Connect/Disconnect.
+"""Вкладка СОЕДИНЕНИЕ: подключение по COM + панель CLI-команд.
 
-Эмитит kivy-события `on_connect_requested(port)` и `on_disconnect_requested()`.
-MainApp слушает их через bind() и вызывает контроллер.
+  - CONNECTION  — combo COM + Refresh + Connect/Disconnect
+  - CLI COMMANDS — все команды прошивки, разложенные по подсистемам
+
+CliControlPanel активна только когда есть подключение — иначе кнопки
+отправят команды в никуда.
 """
 
 from __future__ import annotations
 
 from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.button import Button
-from kivy.uix.label import Label
-from kivy.uix.spinner import Spinner
+from kivy.uix.scrollview import ScrollView
 from serial.tools import list_ports
 
-from .theme import COL_DIGITAL, COL_LABEL
+from .cli_control_panel import CliControlPanel
+from .panel import Panel
+from .widgets import IndustrialButton, IndustrialSpinner
 
 
 class ConnectTab(BoxLayout):
-    # BoxLayout уже EventDispatcher — собственные события регистрируем тут.
-    __events__ = ("on_connect_requested", "on_disconnect_requested")
+    __events__ = (
+        "on_connect_requested",
+        "on_disconnect_requested",
+        "on_command_requested",
+    )
 
     def __init__(self, **kwargs) -> None:
-        super().__init__(orientation="vertical", padding=12, spacing=12, **kwargs)
-
+        super().__init__(orientation="vertical", padding=12, spacing=10, **kwargs)
         self._connected = False
-        self._port_map: dict[str, str] = {}    # label -> device
+        self._port_map: dict[str, str] = {}
 
-        # ---- header ----
-        header = Label(
-            text=f"[b][color={COL_DIGITAL}]CONNECTION[/color][/b]",
-            markup=True,
-            size_hint_y=None, height="32dp",
-            halign="left", valign="middle",
+        scroll = ScrollView(
+            do_scroll_x=False, do_scroll_y=True,
+            bar_width=8, scroll_type=["bars", "content"],
         )
-        header.bind(size=lambda *_: setattr(header, "text_size", header.size))
-        self.add_widget(header)
+        inner = BoxLayout(
+            orientation="vertical",
+            size_hint_y=None, spacing=10,
+        )
+        inner.bind(minimum_height=inner.setter("height"))
 
-        # ---- row: combo + refresh + connect ----
-        row = BoxLayout(orientation="horizontal", size_hint_y=None, height="48dp", spacing=8)
+        # ---- CONNECTION panel ----
+        port_panel = Panel("CONNECTION", size_hint_y=None, height="84dp")
 
-        self.spinner_port = Spinner(
-            text="(нет портов)",
-            values=[],
-            size_hint_x=1,
+        row = BoxLayout(
+            orientation="horizontal",
+            size_hint_y=None, height="40dp",
+            spacing=8,
         )
 
-        self.btn_refresh = Button(
+        self.spinner_port = IndustrialSpinner(
+            text="(нет портов)", values=[], size_hint_x=1,
+        )
+
+        self.btn_refresh = IndustrialButton(
             text="REFRESH", size_hint_x=None, width="120dp",
         )
         self.btn_refresh.bind(on_release=lambda _b: self.refresh_ports())
 
-        self.btn_connect = Button(
+        self.btn_connect = IndustrialButton(
             text="CONNECT", size_hint_x=None, width="180dp",
         )
         self.btn_connect.bind(on_release=lambda _b: self._on_connect_clicked())
@@ -57,28 +66,33 @@ class ConnectTab(BoxLayout):
         row.add_widget(self.spinner_port)
         row.add_widget(self.btn_refresh)
         row.add_widget(self.btn_connect)
-        self.add_widget(row)
+        port_panel.add_widget(row)
 
-        # ---- hint ----
-        hint = Label(
-            text=f"[color={COL_LABEL}]Выбери COM-порт и нажми CONNECT. "
-                 f"После подключения переходи на вкладку TERMINAL.[/color]",
-            markup=True,
-            size_hint_y=None, height="28dp",
-            halign="left", valign="middle",
+        inner.add_widget(port_panel)
+
+        # ---- CLI COMMANDS panel ----
+        cli_panel = Panel("CLI COMMANDS", size_hint_y=None)
+        self.cli = CliControlPanel()
+        self.cli.bind(on_command_requested=self._on_cli_command)
+        cli_panel.add_widget(self.cli)
+        # высота cli_panel = заголовок + padding + cli.height
+        self.cli.bind(
+            height=lambda _w, h: setattr(cli_panel, "height", h + 20 + 24),
         )
-        hint.bind(size=lambda *_: setattr(hint, "text_size", hint.size))
-        self.add_widget(hint)
 
-        # ---- spacer ----
-        self.add_widget(BoxLayout())
+        inner.add_widget(cli_panel)
+        inner.add_widget(BoxLayout(size_hint_y=None, height="6dp"))
+
+        scroll.add_widget(inner)
+        self.add_widget(scroll)
 
         self.refresh_ports()
+        self._set_cli_enabled(False)
 
     # ---- ports ----------------------------------------------------------
 
     def refresh_ports(self) -> None:
-        prev_label = self.spinner_port.text
+        prev = self.spinner_port.text
         self._port_map.clear()
         labels: list[str] = []
         for p in list_ports.comports():
@@ -88,22 +102,35 @@ class ConnectTab(BoxLayout):
         if not labels:
             labels = ["(нет портов)"]
         self.spinner_port.values = labels
-        # Сохранить выбранный порт, если он всё ещё в списке.
-        if prev_label in labels:
-            self.spinner_port.text = prev_label
+        if prev in labels:
+            self.spinner_port.text = prev
         else:
             self.spinner_port.text = labels[0]
 
-    # ---- API из контроллера/MainApp ------------------------------------
+    # ---- API из MainApp ------------------------------------------------
 
     def set_connected(self, connected: bool) -> None:
         self._connected = connected
         self.btn_connect.text = "DISCONNECT" if connected else "CONNECT"
-        # Во время сессии запретить смену порта.
         self.spinner_port.disabled = connected
         self.btn_refresh.disabled  = connected
+        self._set_cli_enabled(connected)
 
-    # ---- internals ------------------------------------------------------
+    # ---- internals -----------------------------------------------------
+
+    def _set_cli_enabled(self, enabled: bool) -> None:
+        # Пробежать по всем кнопкам CliControlPanel и выставить disabled.
+        # Slider-ы и SpinBox-ы просто перестанут эмитить команды (а
+        # эмитят они через bind в строке выше — отключение кнопок этого
+        # достаточно для безопасности).
+        from kivy.uix.widget import Widget
+
+        def walk(w: Widget):
+            for child in w.children:
+                if hasattr(child, "disabled"):
+                    child.disabled = not enabled
+                walk(child)
+        walk(self.cli)
 
     def _on_connect_clicked(self) -> None:
         if self._connected:
@@ -113,7 +140,9 @@ class ConnectTab(BoxLayout):
         if port:
             self.dispatch("on_connect_requested", port)
 
-    # ---- default handlers ----------------------------------------------
+    def _on_cli_command(self, _panel, cmd: str) -> None:
+        self.dispatch("on_command_requested", cmd)
 
     def on_connect_requested(self, *_a, **_k) -> None: ...
     def on_disconnect_requested(self, *_a, **_k) -> None: ...
+    def on_command_requested(self, *_a, **_k) -> None: ...
