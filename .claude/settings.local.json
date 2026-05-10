@@ -9,7 +9,8 @@
       "PowerShell(& \"c:\\\\STM32\\\\StepperControl\\\\software\\\\.venv\\\\Scripts\\\\python.exe\" -m pip install Pillow)",
       "PowerShell(& \"c:\\\\STM32\\\\StepperControl\\\\software\\\\.venv\\\\Scripts\\\\python.exe\" -c \"from PIL import Image; img = Image.open\\(r'c:\\\\STM32\\\\StepperControl\\\\software\\\\controller_app\\\\resource\\\\izto_logo.png'\\); img.save\\(r'c:\\\\STM32\\\\StepperControl\\\\software\\\\controller_app\\\\resource\\\\izto_logo.ico', sizes=[\\(16,16\\),\\(24,24\\),\\(32,32\\),\\(48,48\\),\\(64,64\\),\\(128,128\\),\\(256,256\\)]\\); print\\('ICO saved'\\); print\\('size:', img.size\\)\")",
       "PowerShell(Move-Item -Force c:\\\\STM32\\\\StepperControl\\\\software\\\\dist\\\\HMI_Panel.exe c:\\\\STM32\\\\StepperControl\\\\software\\\\HMI_Panel.exe)",
-      "PowerShell(Remove-Item -Recurse -Force -Confirm:$false c:\\\\STM32\\\\StepperControl\\\\software\\\\dist)"
+      "PowerShell(Remove-Item -Recurse -Force -Confirm:$false c:\\\\STM32\\\\StepperControl\\\\software\\\\dist)",
+      "Bash(dir c:\\\\STM32\\\\StepperControl\\\\shared /s /b)"
     ]
   }
 }

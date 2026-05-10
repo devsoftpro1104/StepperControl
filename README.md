@@ -8,7 +8,6 @@
 ```
 project-root/
 ├── docs/        ← документация и ADR
-├── shared/      ← кросс-проектные артефакты (YAML-описание протокола)
 ├── firmware/    ← прошивка STM32F407 (CMake + arm-none-eabi-gcc)
 ├── software/    ← десктопное GUI (PySide6, MVC)
 ├── tools/       ← скрипты сборки/прошивки/релиза
