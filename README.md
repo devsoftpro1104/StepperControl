@@ -34,7 +34,7 @@ project-root/
 | [docs/ah49e.md](docs/ah49e.md)                 | Линейный Hall AH49E через ADC1                                          |
 | [docs/ds18b20.md](docs/ds18b20.md)             | Термосенсор DS18B20, 1-Wire bit-bang                                    |
 | [docs/watchdog.md](docs/watchdog.md)           | IWDG: параметры, расчёт запаса, отладка под JTAG                        |
-| [docs/protocol.md](docs/protocol.md)           | Заметка про бинарный TLV-канал (план, не задействован)                  |
+| [docs/protocol.md](docs/protocol.md)           | Заметка про бинарный канал (план, не задействован)                      |
 | [docs/developer_setup.md](docs/developer_setup.md) | Установка тулчейна и сборка                                          |
 | [docs/user_manual.md](docs/user_manual.md)     | Как пользоваться GUI                                                    |
 | [docs/adr/](docs/adr/)                         | Architecture Decision Records (LL vs HAL, FreeRTOS, Qt6, …)             |

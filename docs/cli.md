@@ -7,7 +7,7 @@ GUI на PyQt/PySide6.
 Первоисточник по грамматике — заголовок [firmware/src/middleware/shell/inc/shell.h](../firmware/src/middleware/shell/inc/shell.h).
 Реализация диспетчера — [shell.c](../firmware/src/middleware/shell/src/shell.c).
 
-> CLI **не заменяет** бинарный TLV-протокол из [protocol.md](protocol.md). Текстовый
+> CLI **не заменяет** бинарный протокол из [protocol.md](protocol.md). Текстовый
 > канал удобен для интерактивной диагностики и быстрой интеграции GUI; бинарный
 > остаётся для трактов, где важна плотность и гарантии CRC. Транспорт у обоих
 > один и тот же — USART2, 115200 8N1.

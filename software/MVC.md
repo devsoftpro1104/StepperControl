@@ -251,7 +251,7 @@ app.aboutToQuit.connect(controller.shutdown)
 
 ## Что осталось вне MVC (намеренно)
 
-- **Бинарный TLV-протокол** — когда добавится, появится `models/protocol_tlv.py`
+- **Бинарный протокол** — когда добавится, появится `models/protocol_binary.py`
   рядом с `parser.py`. Контроллер выбирает, какой парсер использовать.
 - **Сохранение настроек** — `models/settings.py` (QSettings обёртка) +
   слот в контроллере на `app.aboutToQuit`.
