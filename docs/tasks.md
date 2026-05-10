@@ -80,7 +80,7 @@ static const osThreadAttr_t s_attr_default = {
 | `hall`      | [`task_hall.c`](../firmware/src/app/src/tasks/task_hall.c)                 | Normal        |       1024 | `period_ms` сервиса (10..60000 мс)     |
 | `probe`     | [`task_probe.c`](../firmware/src/app/src/tasks/task_probe.c)               | Normal        |       1024 | `period_ms` сервиса (через `PROBE RATE`) |
 | `diag`      | [`task_diagnostic.c`](../firmware/src/app/src/tasks/task_diagnostic.c)     | Normal        |        256 | `osDelay(500 ms)`                      |
-| `wdg`       | [`task_watchdog.c`](../firmware/src/app/src/tasks/task_watchdog.c)         | Normal        |        256 | `osDelay(200 ms)` (заглушка)           |
+| `wdg`       | [`task_watchdog.c`](../firmware/src/app/src/tasks/task_watchdog.c)         | Normal        |        256 | `osDelay(200 ms)` + `LL_IWDG_ReloadCounter` |
 
 ### 3.1. Чем заняты задачи
 
@@ -137,7 +137,11 @@ static const osThreadAttr_t s_attr_default = {
 - Никаких блокирующих вызовов, `snprintf` нет → стек 256 байт.
 
 #### `wdg` — поддержка IWDG
-- Сейчас заглушка: `osDelay(200)`. TODO: `LL_IWDG_ReloadCounter(IWDG)`.
+- При старте: `LL_IWDG_Enable` → write access → prescaler `/32`, reload `1000`
+  (LSI ≈ 32 кГц → тик 1 мс, таймаут ~1 с) → ждём `LL_IWDG_IsReady` → первый reload.
+- В цикле: `LL_IWDG_ReloadCounter(IWDG)` каждые 200 мс — пятикратный запас по
+  таймауту. Если RTOS зависнет / `wdg`-задача не получит CPU дольше ~1 с —
+  IWDG ресетнёт МК.
 
 ---
 

@@ -13,6 +13,7 @@
 #define LL_PWR_MODULE_ENABLED
 #define LL_CORTEX_MODULE_ENABLED
 #define LL_UTILS_MODULE_ENABLED
+#define LL_IWDG_MODULE_ENABLED
 
 #define HSE_VALUE                ((uint32_t)8000000U)
 #define HSI_VALUE                ((uint32_t)16000000U)
@@ -29,5 +30,6 @@
 #include "stm32f4xx_ll_pwr.h"
 #include "stm32f4xx_ll_cortex.h"
 #include "stm32f4xx_ll_utils.h"
+#include "stm32f4xx_ll_iwdg.h"
 
 #endif /* STM32F4XX_LL_CONF_H */
