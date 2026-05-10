@@ -198,7 +198,7 @@ app
 - `task_hall.c` — периодический опрос AH49E через ADC1, эмиссия `$H`.
 - `task_probe.c` — самодиагностика STEP через ADC2 + DMA, эмиссия `$P`.
 - `task_diagnostic.c` — LED-маяк 1 Гц (признак, что планировщик жив).
-- `task_watchdog.c` — поддержка IWDG: разовая инициализация (LSI/32, таймаут ~1 с) + reload каждые 200 мс.
+- `task_watchdog.c` — поддержка IWDG: разовая инициализация (LSI/32, таймаут ~1 с) + reload каждые 200 мс. См. [watchdog.md](watchdog.md).
 
 #### `firmware/src/bsp/` — Board Support Package
 Знает про **конкретную плату**: тактовая 168 МГц от HSE, конкретные пины,

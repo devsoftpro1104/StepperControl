@@ -142,6 +142,7 @@ static const osThreadAttr_t s_attr_default = {
 - В цикле: `LL_IWDG_ReloadCounter(IWDG)` каждые 200 мс — пятикратный запас по
   таймауту. Если RTOS зависнет / `wdg`-задача не получит CPU дольше ~1 с —
   IWDG ресетнёт МК.
+- Подробнее (разброс LSI, отладка под JTAG, ограничения) — см. [watchdog.md](watchdog.md).
 
 ---
 

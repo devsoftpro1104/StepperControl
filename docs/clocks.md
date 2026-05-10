@@ -61,6 +61,7 @@ SYSCLK (168 MHz)
 | 1-Wire bit-bang   | core | DWT CYCCNT @ 168 МГц | [onewire.c](../firmware/src/drivers/onewire/src/onewire.c) — `dwt_enable()`, микросекундные тайминги через `SystemCoreClock/1_000_000` |
 | SysTick           | core | HCLK = 168 МГц    | [bsp_clock.c](../firmware/src/bsp/src/bsp_clock.c) — `LL_Init1msTick(168000000)` |
 | FreeRTOS tick     | —    | 1 кГц от SysTick  | [FreeRTOSConfig.h](../firmware/src/config/FreeRTOSConfig.h) — `configTICK_RATE_HZ` |
+| IWDG (watchdog)   | —    | LSI ≈ 32 кГц / 32 = 1 кГц | [task_watchdog.c](../firmware/src/app/src/tasks/task_watchdog.c) — независим от HSE/PLL, см. [watchdog.md](watchdog.md) |
 
 > PLL_Q = 7 (USB48) сконфигурирован в [bsp_clock.c](../firmware/src/bsp/src/bsp_clock.c), но USB OTG FS пока не используется (CDC-драйвера в проекте нет, транспорт — UART2). Если USB будет добавлен — клок 48 МГц уже готов.
 
